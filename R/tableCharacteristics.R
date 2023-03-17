@@ -8,24 +8,22 @@
 #' @param referenceGroup Group of reference to compute the smd. If it is NULL no
 #' reference group is picked.
 #' @param numericVariables Variables included in the numeric group. If NA they
-#' are detected automatically see detectVariableType(). If NULL this group is
-#' not applied.
+#' are detected automatically see variableTypes(). If NULL this group is not
+#' applied.
 #' @param numericFormat Format for the numericVariables. See numericFormats()
 #' for the available options. More information in xxx vignette.
 #' @param dateVariables Variables included in the date group. If NA they are
-#' detected automatically see detectVariableType(). If NULL this group is not
-#' used.
+#' detected automatically see variableTypes(). If NULL this group is not used.
 #' @param dateFormat Format for the numericVariables. See dateFormats()
 #' for the available options. More information in xxx vignette.
 #' @param categoricalVariables Variables included in the categorical group. If
-#' NA they are detected automatically see detectVariableType(). If NULL this
-#' group is not used.
+#' NA they are detected automatically see variableTypes(). If NULL this group is
+#' not used.
 #' @param categoricalFormat Format for the categoricalVariables. See
 #' categoricalFormats() for the available options. More information in xxx
 #' vignette.
 #' @param binaryVariables Variables included in the binary group. If NA they are
-#' detected automatically see detectVariableType(). If NULL this group is not
-#' used.
+#' detected automatically see variableTypes(). If NULL this group is not used.
 #' @param binaryFormat Format for the binaryVariables. See binaryFormats() for
 #' the available options. More information in xxx vignette.
 #' @param otherVariables List of variables included in the different groups. All
@@ -69,6 +67,7 @@ tableCharacteristics <- function (
     decimal = ".",
     significativeDecimals = 2
 ) {
+
   # check other variables --> list of characters
   # check that grouping + variables is present
   if (is.na(numericVariables)) {

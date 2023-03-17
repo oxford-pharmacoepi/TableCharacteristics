@@ -5,7 +5,6 @@ mean, median, sd, qXX, count, distinct, min, max, %
 
 ### tableCharacteristics(
   x,
-  
   grouping = NULL,
   refernceGroup = NULL,
   numericVariables = NA,

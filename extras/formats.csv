@@ -1,0 +1,25 @@
+﻿type,format_key,applied_function,info,NA,warnings
+numeric,mean,mean of the variable of interest.,,NA are not considered.,
+numeric,sd,standard deviation of the variable of interest.,,NA are not considered.,
+numeric,median,median of the variable of interest.,,NA are not considered.,
+numeric,qXX,qualtile of XX% the variable of interest.,XX can be any integer between 0 and 100.,NA are not considered.,
+numeric,min,minimum of the variable of interest.,,NA are not considered.,
+numeric,max,maximum of the variable of interest.,,NA are not considered.,
+numeric,sum,sum of all the values for the variable of interest.,,NA are not considered.,
+date,mean,mean of the date of interest.,,NA are not considered.,Dates are rounded to nearest day.
+date,sd,standard deviation of the date of interest. ,,NA are not considered.,
+date,median,median of the date of interest.,,NA are not considered.,Dates are rounded to nearest day.
+date,qXX,qualtile of XX% of the date of interest.,XX can be any integer between 0 and 100.,NA are not considered.,Dates are rounded to nearest day.
+date,min,minimum of the date of interest.,,NA are not considered.,Dates are rounded to nearest day.
+date,max,maximum of the date of interest.,,NA are not considered.,Dates are rounded to nearest day.
+categorical,count,number of times that each category is observed.,,NA are not considered.,
+categorical,%,percentage of individuals with that category,,NA are not considered.,
+categorical,distinct,number of distinct categories,,NA are not considered.,
+categorical,mean,mean number of individuals per category,,NA are not considered.,
+categorical,sd,standard deviation of the number of individuals per category,,NA are not considered.,
+categorical,median,median number of individuals per category,,NA are not considered.,
+categorical,qXX,qualtile of XX% of the number of individuals per category,,NA are not considered.,
+categorical,min,minimum number of individuals per category,,NA are not considered.,
+categorical,max,maximum number of individuals per category,,NA are not considered.,
+binary,count,number of times that each category is observed.,,NA are not considered.,
+binary,%,percentage of individuals with that category,,NA are not considered.,

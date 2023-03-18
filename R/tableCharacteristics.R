@@ -50,7 +50,7 @@
 tableCharacteristics <- function (
     x,
     groupVariable = NULL,
-    refernceGroup = NULL,
+    referenceGroup = NULL,
     numericVariables = NA,
     numericFormat = "median [q25 - q75]",
     dateVariables = NA,
@@ -67,7 +67,41 @@ tableCharacteristics <- function (
     decimal = ".",
     significativeDecimals = 2
 ) {
+  checkmate::assertTibble(x, min.rows = 1, min.cols = 1)
+  checkmate::assertCharacter(
+    groupVariable, len = 1, any.missing = FALSE, null.ok = TRUE
+  )
+  if (!is.null(groupVariable)) {
+    checkmate::assertTRUE(groupVariable %in% colnames(x))
+    checkmate::assertTRUE(length(referenceGroup) == 1)
+    groups <- x %>%
+      dplyr::select(dplyr::all_of(groupVariable)) %>%
+      dplyr::distinct() %>%
+      dplyr::pull()
+    checkmate::assertTRUE(referenceGroup %in% groups)
+  } else {
+    checkmate::assertNull(referenceGroup)
+  }
+  variableType <- variableTypes(x)
+  if (is.na(numericVariables)) {
+    numericVariables <- x %>%
+      dplyr::filter(.data$classification == "numeric") %>%
+      dplyr::pull("variable")
+  }
+  if (!is.null(numericVariables)) {
+    checkmate::assertTRUE(numericVariables %in% colnames(x))
+    checkmate::assertTRUE(all(
+      variableType %>%
+        dplyr::filter(.data$variable %in% .env$numericVariables) %>%
+        dplyr::pull("classification") %in%
+        c("numeric", "binary")
+    ))
+    check <- assertFormat(numericFormat, "numeric")
+  } else {
 
+  }
+
+  referenceGroup <- lapply(referenceGroup)
   # check other variables --> list of characters
   # check that grouping + variables is present
   if (is.na(numericVariables)) {

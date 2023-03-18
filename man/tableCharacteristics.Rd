@@ -9,7 +9,7 @@ mean differences statistics.}
 tableCharacteristics(
   x,
   groupVariable = NULL,
-  refernceGroup = NULL,
+  referenceGroup = NULL,
   numericVariables = NA,
   numericFormat = "median [q25 - q75]",
   dateVariables = NA,
@@ -33,28 +33,29 @@ tableCharacteristics(
 \item{groupVariable}{Variable of x that contains the grouping. If it is NULL
 No groupping is used.}
 
+\item{referenceGroup}{Group of reference to compute the smd. If it is NULL no
+reference group is picked.}
+
 \item{numericVariables}{Variables included in the numeric group. If NA they
-are detected automatically see detectVariableType(). If NULL this group is
-not applied.}
+are detected automatically see variableTypes(). If NULL this group is not
+applied.}
 
 \item{numericFormat}{Format for the numericVariables. See numericFormats()
 for the available options. More information in xxx vignette.}
 
 \item{dateVariables}{Variables included in the date group. If NA they are
-detected automatically see detectVariableType(). If NULL this group is not
-used.}
+detected automatically see variableTypes(). If NULL this group is not used.}
 
 \item{categoricalVariables}{Variables included in the categorical group. If
-NA they are detected automatically see detectVariableType(). If NULL this
-group is not used.}
+NA they are detected automatically see variableTypes(). If NULL this group is
+not used.}
 
 \item{categoricalFormat}{Format for the categoricalVariables. See
 categoricalFormats() for the available options. More information in xxx
 vignette.}
 
 \item{binaryVariables}{Variables included in the binary group. If NA they are
-detected automatically see detectVariableType(). If NULL this group is not
-used.}
+detected automatically see variableTypes(). If NULL this group is not used.}
 
 \item{binaryFormat}{Format for the binaryVariables. See binaryFormats() for
 the available options. More information in xxx vignette.}
@@ -78,9 +79,6 @@ order. If NA they are sorted alphabetically.}
 
 \item{significativeDecimals}{Number of significant decimals for numeric (non
 integer data)}
-
-\item{referenceGroup}{Group of reference to compute the smd. If it is NULL no
-reference group is picked.}
 
 \item{dateFormat}{Format for the numericVariables. See dateFormats()
 for the available options. More information in xxx vignette.}

@@ -2,11 +2,13 @@
 #'
 #' @return Tibble with the available numeric format keys
 #'
-#' @example numericFormat()
+#' @examples
+#' library(TableCharacteristics)
+#' numericFormats()
 #'
 #' @export
 #'
-numericFormat <- function() {
+numericFormats <- function() {
   return(format("numeric"))
 }
 
@@ -14,11 +16,13 @@ numericFormat <- function() {
 #'
 #' @return Tibble with the available date format keys
 #'
-#' @example dateFormat()
+#' @examples
+#' library(TableCharacteristics)
+#' dateFormats()
 #'
 #' @export
 #'
-dateFormat <- function() {
+dateFormats <- function() {
   return(format("date"))
 }
 
@@ -26,11 +30,13 @@ dateFormat <- function() {
 #'
 #' @return Tibble with the available categorical format keys
 #'
-#' @example categoricalFormat()
+#' @examples
+#' library(TableCharacteristics)
+#' categoricalFormats()
 #'
 #' @export
 #'
-categoricalFormat <- function() {
+categoricalFormats <- function() {
   return(format("categorical"))
 }
 
@@ -38,11 +44,13 @@ categoricalFormat <- function() {
 #'
 #' @return Tibble with the available binary format keys
 #'
-#' @example binaryFormat()
+#' @examples
+#' library(TableCharacteristics)
+#' binaryFormats()
 #'
 #' @export
 #'
-binaryFormat <- function() {
+binaryFormats <- function() {
   return(format("binary"))
 }
 
@@ -67,17 +75,17 @@ variableTypes <- function(x) {
 
 #' @noRd
 assertClassification <- function(x, tib) {
-  lapply(x, function(x) {
-    if (x == "lgl") {
+  lapply(seq_along(x), function(i) {
+    if (x[i] == "lgl") {
       return("binary")
-    } else if (x %in% c("chr", "fct", "ord")) {
+    } else if (x[i] %in% c("chr", "fct", "ord")) {
         return("categorical")
-    } else if (x %in% c("date", "dttm")) {
+    } else if (x[i] %in% c("date", "dttm")) {
       return("date")
-    } else if (x == "drtn") {
+    } else if (x[i] == "drtn") {
       return("numeric")
-    } else if (x %in% c("int", "dbl", "int64")) {
-      lab <- unique(tib[[x]])
+    } else if (x[i] %in% c("int", "dbl", "int64")) {
+      lab <- unique(tib[[i]])
       if (length(lab) <= 2 && all(lab %in% c(0, 1))) {
         return("binary")
       } else {
@@ -119,4 +127,9 @@ cleanTypes <- function(x, vt) {
     }
   }
   return(x)
+}
+
+#' @noRd
+assertFormat <- function(f, vt) {
+
 }

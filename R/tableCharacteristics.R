@@ -67,10 +67,14 @@ tableCharacteristics <- function (
     decimal = ".",
     significativeDecimals = 2
 ) {
+  # check x is tibble
   checkmate::assertTibble(x, min.rows = 1, min.cols = 1)
+  # assert that groupVariable is character
   checkmate::assertCharacter(
     groupVariable, len = 1, any.missing = FALSE, null.ok = TRUE
   )
+  # if groupVariable exist check that is a column of x and referenceGroup is
+  # present
   if (!is.null(groupVariable)) {
     checkmate::assertTRUE(groupVariable %in% colnames(x))
     checkmate::assertTRUE(length(referenceGroup) == 1)
@@ -82,12 +86,32 @@ tableCharacteristics <- function (
   } else {
     checkmate::assertNull(referenceGroup)
   }
+  # detect all variables type
   variableType <- variableTypes(x)
+  # if variables groups are NA detect automatically
   if (is.na(numericVariables)) {
     numericVariables <- x %>%
       dplyr::filter(.data$classification == "numeric") %>%
       dplyr::pull("variable")
   }
+  if (is.na(dateVariables)) {
+    dateVariables <- x %>%
+      dplyr::filter(.data$classification == "date") %>%
+      dplyr::pull("variable")
+  }
+  if (is.na(categoricalVariables)) {
+    categoricalVariables <- x %>%
+      dplyr::filter(.data$classification == "categorical") %>%
+      dplyr::pull("variable")
+  }
+  if (is.na(binaryVariables)) {
+    binaryVariables <- x %>%
+      dplyr::filter(.data$classification == "binary") %>%
+      dplyr::pull("variable")
+  }
+  # start a tibble with all the variables and functions that should be applied
+  variables <- NULL
+  # numeric variables
   if (!is.null(numericVariables)) {
     checkmate::assertTRUE(numericVariables %in% colnames(x))
     checkmate::assertTRUE(all(
@@ -96,9 +120,85 @@ tableCharacteristics <- function (
         dplyr::pull("classification") %in%
         c("numeric", "binary")
     ))
-    check <- assertFormat(numericFormat, "numeric")
+    functions <- assertFormat(numericFormat, "numeric")
+    if (length(functions) == 0) {
+      stop("No function detected in numericFormat")
+    } else {
+      variables <- variables %>%
+        dplyr::union_all(tidyr::expand_grid(
+          variable = numericVariables,
+          fun = functions,
+          variable_type = "numeric"
+        ))
+    }
   } else {
-
+    checkmate::assertNull(numericFormat)
+  }
+  # date variables
+  if (!is.null(dateVariables)) {
+    checkmate::assertTRUE(dateVariables %in% colnames(x))
+    checkmate::assertTRUE(all(
+      variableType %>%
+        dplyr::filter(.data$variable %in% .env$dateVariables) %>%
+        dplyr::pull("classification") == "date"
+    ))
+    functions <- assertFormat(dateFormat, "date")
+    if (length(functions) == 0) {
+      stop("No function detected in dateFormat")
+    } else {
+      variables <- variables %>%
+        dplyr::union_all(tidyr::expand_grid(
+          variable = dateVariables,
+          fun = functions,
+          variable_type = "date"
+        ))
+    }
+  } else {
+    checkmate::assertNull(dateFormat)
+  }
+  # categorical variables
+  if (!is.null(categoricalVariables)) {
+    checkmate::assertTRUE(categoricalVariables %in% colnames(x))
+    checkmate::assertTRUE(all(
+      variableType %>%
+        dplyr::filter(.data$variable %in% .env$categoricalVariables) %>%
+        dplyr::pull("classification") == "categorical"
+    ))
+    functions <- assertFormat(categoricalFormat, "categorical")
+    if (length(functions) == 0) {
+      stop("No function detected in categoricalFormat")
+    } else {
+      variables <- variables %>%
+        dplyr::union_all(tidyr::expand_grid(
+          variable = categoricalVariables,
+          fun = functions,
+          variable_type = "categorical"
+        ))
+    }
+  } else {
+    checkmate::assertNull(categoricalFormat)
+  }
+  # binary variables
+  if (!is.null(binaryVariables)) {
+    checkmate::assertTRUE(binaryVariables %in% colnames(x))
+    checkmate::assertTRUE(all(
+      variableType %>%
+        dplyr::filter(.data$variable %in% .env$binaryVariables) %>%
+        dplyr::pull("classification") == "binary"
+    ))
+    functions <- assertFormat(binaryFormat, "binary")
+    if (length(functions) == 0) {
+      stop("No function detected in binaryFormat")
+    } else {
+      variables <- variables %>%
+        dplyr::union_all(tidyr::expand_grid(
+          variable = binaryVariables,
+          fun = functions,
+          variable_type = "binary"
+        ))
+    }
+  } else {
+    checkmate::assertNull(binaryFormat)
   }
 
   referenceGroup <- lapply(referenceGroup)

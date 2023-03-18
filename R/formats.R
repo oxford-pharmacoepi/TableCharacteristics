@@ -131,5 +131,24 @@ cleanTypes <- function(x, vt) {
 
 #' @noRd
 assertFormat <- function(f, vt) {
-
+  keys <- formats %>%
+    dplyr::filter(.data$type == .env$vt) %>%
+    dplyr::pull("format_key")
+  quantile_flag <- "qXX" %in% keys
+  if (quantile_flag) {
+    f <- gsub("q00", "min", f)
+    f <- gsub("q50", "median", f)
+    f <- gsub("q100", "max", f)
+  }
+  keys <- keys[keys != "qXX"]
+  keys <- keys[lapply(keys, function(x){grepl(x, f)}) %>% unlist()]
+  if (quantile_flag) {
+    for (k in 1:99) {
+      key <- paste0("q", strngr::str_pad(k, 2, "0"))
+      if (grepl(key, f)) {
+        keys <- c(keys, key)
+      }
+    }
+  }
+  return(keys)
 }

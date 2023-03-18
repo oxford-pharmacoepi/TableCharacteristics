@@ -88,6 +88,10 @@ tableCharacteristics <- function (
   }
   # detect all variables type
   variableType <- variableTypes(x)
+  # start a tibble with all the variables and functions that should be applied
+  variables <- NULL
+  # check other variables
+  # HERE I AM
   # if variables groups are NA detect automatically
   if (is.na(numericVariables)) {
     numericVariables <- x %>%
@@ -109,8 +113,6 @@ tableCharacteristics <- function (
       dplyr::filter(.data$classification == "binary") %>%
       dplyr::pull("variable")
   }
-  # start a tibble with all the variables and functions that should be applied
-  variables <- NULL
   # numeric variables
   if (!is.null(numericVariables)) {
     checkmate::assertTRUE(numericVariables %in% colnames(x))

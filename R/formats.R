@@ -118,11 +118,11 @@ format <- function(x) {
 #' @noRd
 cleanTypes <- function(x, vt) {
   for (k in 1:nrow(vt)) {
-    if (vt$classification[k] %in% c("binary", "numeric")) {
+    if (vt$variable_type[k] %in% c("binary", "numeric")) {
       x[[vt$variable[k]]] <- as.numeric(x[[vt$variable[k]]])
-    } else if (vt$classification[k] == "categorical") {
+    } else if (vt$variable_type[k] == "categorical") {
       x[[vt$variable[k]]] <- as.character(x[[vt$variable[k]]])
-    } else if (vt$classification[k] == "date") {
+    } else if (vt$variable_type[k] == "date") {
       x[[vt$variable[k]]] <- as.Date(x[[vt$variable[k]]])
     }
   }
@@ -144,11 +144,22 @@ assertFormat <- function(f, vt) {
   keys <- keys[lapply(keys, function(x){grepl(x, f)}) %>% unlist()]
   if (quantile_flag) {
     for (k in 1:99) {
-      key <- paste0("q", strngr::str_pad(k, 2, "0"))
+      key <- paste0("q", stringr::str_pad(k, 2, pad = "0"))
       if (grepl(key, f)) {
         keys <- c(keys, key)
       }
     }
   }
   return(keys)
+}
+
+#' @noRd
+compatibleType <- function(t) {
+  if (length(t) == 1 && t %in% c("numeric", "binary", "date", "categorical")) {
+    return(t)
+  } else if (length(t) == 2 && t %in% c("numeric", "binary")) {
+    return("numeric")
+  } else {
+    return("incompatible")
+  }
 }

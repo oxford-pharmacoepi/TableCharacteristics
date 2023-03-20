@@ -36,7 +36,7 @@
 #' @param order Order of the variables. If NULL variables appear as the column
 #' order. If NA they are sorted alphabetically.
 #' @param bigMark Thousands separator.
-#' @param decimal Decimal separator.
+#' @param decimalMark Decimal separator.
 #' @param significativeDecimals Number of significant decimals for numeric (non
 #' integer data)
 #'
@@ -64,7 +64,7 @@ tableCharacteristics <- function (
     groupNames = list(),
     order = NULL,
     bigMark = ",",
-    decimal = ".",
+    decimalMark = ".",
     significativeDecimals = 2
 ) {
   # initial checks ----
@@ -399,10 +399,12 @@ summaryValues <- function(x, variables, group) {
     variable = character(),
     variable_classification = character(),
     fun = character(),
-    value = character()
+    value = character(),
+    groupping = character()
   )
+  # numeric variables
   variablesNumeric <- variables %>%
-    dplyr::filter(.data$variable_type == "numeric")
+    dplyr::filter(.data$variable_classification == "numeric")
   if (nrow(variablesNumeric) > 0) {
     functions <- variablesNumeric %>%
       dplyr::pull("fun") %>%
@@ -410,59 +412,83 @@ summaryValues <- function(x, variables, group) {
     for (k in seq_along(functions)) {
       variablesFunction <- variablesNumeric %>%
         dplyr::filter(.data$fun == .env$functions[k]) %>%
-        dplyr::pull("variables")
-      result <- result %>%
-        dplyr::union_all(
-          x %>%
-            dplyr::summarise(dplyr::across(
-              .cols = dplyr::all_of(.env$variablesFunction),
-              .fns = getFunctions(functions[k]),
-              .names = "{.col}"
-            ))
-        )
-    }
-      getFunctions()
-
-  }
-  result <- NULL
-  for (k in 1:nrow(variableGroups)) {
-    xx <- variables %>%
-      dplyr::inner_join(variableGroups[k,], by = c("variable_type", "format"))
-    fun <- xx %>% dplyr::pull("fun")
-    variable <- xx %>% dplyr::pull("variable")
-    functions <- getFunctions(fun)
-    groupType <- variableGroups$varibale_type[k]
-    if (groupType == "numeric") {
-      resultK <- x %>%
-        dplyr::select(dplyr::all_of(c(group, variable))) %>%
+        dplyr::pull("variable")
+      result.k <- x %>%
         dplyr::summarise(dplyr::across(
-          .cols = dplyr::all_of(.env$variable),
-          .fns = functions,
-          .names = "{.col}_{.fn}"
-        )) %>%
-        tidyr::pivot_longer(!dplyr::all_of(group)) %>%
-        dplyr::separate("name", c("variable", "fun")) %>%
-        dplyr::mutate(value = as.character(.data$value))
-    } else if (groupType == "date") {
-      resultK <- x %>%
-        dplyr::select(dplyr::all_of(c(group, variable))) %>%
-        dplyr::mutate(dplyr::across(
-          !dplyr::all_of(group), ~ round(as.numeric(.))
-        )) %>%
-        dplyr::summarise(dplyr::across(
-          .cols = dplyr::all_of(.env$variable),
-          .fns = functions,
-          .names = "{.col}_{.fn}"
-        )) %>%
-        tidyr::pivot_longer(!dplyr::all_of(group)) %>%
-        dplyr::separate("name", c("variable", "fun")) %>%
-        dplyr::mutate(value = dplyr::if_else(
-          .data$fun %in% c("sd", "range", "iqr"),
-          as,character(.data$value),
-          as.character(as.Date(
-            .data$value, origin = "1970-01-01"
-          ))
+          .cols = dplyr::all_of(.env$variablesFunction),
+          .fns = getFunctions(functions[k]),
+          .names = "{.col}"
         ))
+      if (is.null(group)) {
+        result.k <- dplyr::mutate(result.k, groupping = NA)
+      } else {
+        result.k <- dplyr::rename("groupping" = dplyr::all_of(group))
+      }
+      result.k <- result.k %>%
+        dplyr::mutate(dplyr::across(
+          !"groupping",
+          ~ base::format(
+            .x,
+            big.mark = bigMark,
+            decimal.mark = decimalMark,
+            nsmall = ifelse(.x %% 1 == 0, 0, significativeDecimals)
+          )
+        )) %>%
+        tidyr::pivot_longer(!"groupping", names_to = "variable") %>%
+        dplyr::mutate(
+          fun = .env$functions[k], variable_classification = "numeric"
+        )
+      result <- dplyr::union_all(result, result.k)
+    }
+  }
+  # date variables
+  variablesDate <- variables %>%
+    dplyr::filter(.data$variable_type == "date")
+  if (nrow(variablesDate) > 0) {
+    functions <- variablesDate %>%
+      dplyr::pull("fun") %>%
+      unique()
+    for (k in seq_along(functions)) {
+      variablesFunction <- variablesDate %>%
+        dplyr::filter(.data$fun == .env$functions[k]) %>%
+        dplyr::pull("variable")
+      result.k <- x %>%
+        dplyr::summarise(dplyr::across(
+          .cols = dplyr::all_of(.env$variablesFunction),
+          .fns = getFunctions(functions[k]),
+          .names = "{.col}"
+        ))
+      if (is.null(group)) {
+        result.k <- dplyr::mutate(result.k, groupping = NA)
+      } else {
+        result.k <- dplyr::rename("groupping" = dplyr::all_of(group))
+      }
+      if (dateFromats()$result[dateFormats()$format_key == functions[k]] == "date") {
+        result.k <- result.k %>%
+          dplyr::mutate(dplyr::across(
+            !"groupping",
+            ~ as.character(as.Date(round(.x), origin = "1970-01-01"))
+          ))
+      } else {
+        result.k <- result.k %>%
+          dplyr::mutate(dplyr::across(
+            !"groupping",
+            ~ base::format(
+              .x,
+              big.mark = bigMark,
+              decimal.mark = decimalMark,
+              nsmall = ifelse(.x %% 1 == 0, 0, significativeDecimals)
+            )
+          ))
+      }
+      result <- dplyr::union_all(
+        result,
+        result.k %>%
+          tidyr::pivot_longer(!"groupping", names_to = "variable") %>%
+          dplyr::mutate(
+            fun = .env$functions[k], variable_classification = "numeric"
+          )
+      )
     }
   }
 }
@@ -792,6 +818,17 @@ getFunctions <- function(f) {
   return(estimates_func[f])
 }
 
+#' @noRd
+correctFormat <- function(x, bigMark, decimalMark, significativeDecimals) {
+  if (is.numeric(x)) {
+    format(
+      x,
+      big.mark = bigMark,
+      decimal.mark = decimalMark,
+      nsmall = ifelse(x %% 1 == 0, 0, 2)
+    )
+  }
+}
 #' referenceGroup <- lapply(referenceGroup)
 #' # check other variables --> list of characters
 #' # check that grouping + variables is present

@@ -306,49 +306,7 @@ tableCharacteristics <- function (
 
   x <- cleanTypes(x, variables)
 
-
-  referenceGroup <- lapply(referenceGroup)
-  # check other variables --> list of characters
-  # check that grouping + variables is present
-  if (is.na(numericVariables)) {
-    numericVariables <- findNumericVariables(x)
-  }
-  variables <- c(
-    grouping, numericVariables, dateVariables, categoricalVariables,
-    binaryVariables, unlist(otherVariables)
-  )
-  variablesPresence <- variables %in% colnames(x)
-  if (!all(variablesPresence)) {
-    errorVariables <- paste0(variables[!variablesPresence], collapse = ", ")
-    stop(paste0("Variables: ", errorVariables, " are not present in x."))
-  }
-  if (is.null(order)) {
-    order <- colnames(x)
-    order <- order[order %in% variables]
-  }
-
-  values <- summaryValues(x, variables)
-
-  if (!is.null(numericVariables)) {
-    functions <- findFunctions(numericFormat)
-    numericSummary <- x %>%
-      summarise(functions, variables, ungroup)
-    # group, variable, function, result
-  }
-
-  #' add percentages and formats to each number
-
-  formats <- ""
-  ln <- 1
-  for (variable in order) {
-    for (format in formats[[variable]]) {
-      format <- gsub("var", paste0(".data$", variable), format)
-      result <- result %>%
-        mutate(paset0("line_", ln) := paste0(
-        ))
-      ln <- ln + 1
-    }
-  }
+  result <- summaryValues(x, variables, groupVariable)
 
 }
 
@@ -801,3 +759,48 @@ getFunctions <- function(f) {
   )
   return(estimates_func[f])
 }
+
+
+#' referenceGroup <- lapply(referenceGroup)
+#' # check other variables --> list of characters
+#' # check that grouping + variables is present
+#' if (is.na(numericVariables)) {
+#'   numericVariables <- findNumericVariables(x)
+#' }
+#' variables <- c(
+#'   grouping, numericVariables, dateVariables, categoricalVariables,
+#'   binaryVariables, unlist(otherVariables)
+#' )
+#' variablesPresence <- variables %in% colnames(x)
+#' if (!all(variablesPresence)) {
+#'   errorVariables <- paste0(variables[!variablesPresence], collapse = ", ")
+#'   stop(paste0("Variables: ", errorVariables, " are not present in x."))
+#' }
+#' if (is.null(order)) {
+#'   order <- colnames(x)
+#'   order <- order[order %in% variables]
+#' }
+#'
+#' values <- summaryValues(x, variables)
+#'
+#' if (!is.null(numericVariables)) {
+#'   functions <- findFunctions(numericFormat)
+#'   numericSummary <- x %>%
+#'     summarise(functions, variables, ungroup)
+#'   # group, variable, function, result
+#' }
+#'
+#' #' add percentages and formats to each number
+#'
+#' formats <- ""
+#' ln <- 1
+#' for (variable in order) {
+#'   for (format in formats[[variable]]) {
+#'     format <- gsub("var", paste0(".data$", variable), format)
+#'     result <- result %>%
+#'       mutate(paset0("line_", ln) := paste0(
+#'       ))
+#'     ln <- ln + 1
+#'   }
+#' }
+

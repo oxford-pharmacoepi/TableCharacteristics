@@ -443,7 +443,7 @@ summaryValues <- function(x, variables, group) {
   }
   # date variables
   variablesDate <- variables %>%
-    dplyr::filter(.data$variable_type == "date")
+    dplyr::filter(.data$variable_classification == "date")
   if (nrow(variablesDate) > 0) {
     functions <- variablesDate %>%
       dplyr::pull("fun") %>%
@@ -486,11 +486,57 @@ summaryValues <- function(x, variables, group) {
         result.k %>%
           tidyr::pivot_longer(!"groupping", names_to = "variable") %>%
           dplyr::mutate(
-            fun = .env$functions[k], variable_classification = "numeric"
+            fun = .env$functions[k], variable_classification = "date"
           )
       )
     }
   }
+  # binary variables
+  variablesBinary <- variables %>%
+    dplyr::filter(.data$variable_classification == "binary")
+  if (nrow(variablesBinary) > 0) {
+    variablesFunction <- variablesBinary %>%
+      dplyr::pull("variable") %>%
+      unique()
+    result.k <- x %>%
+      dplyr::summarise(dplyr::across(
+        .cols = dplyr::all_of(.env$variablesFunction),
+        .fns = list("sum" = function(x) {sum(x)}),
+        .names = "{.col}"
+      ))
+    if (is.null(group)) {
+      result.k <- dplyr::mutate(result.k, groupping = NA)
+    } else {
+      result.k <- dplyr::rename("groupping" = dplyr::all_of(group))
+    }
+    if (dateFromats()$result[dateFormats()$format_key == functions[k]] == "date") {
+      result.k <- result.k %>%
+        dplyr::mutate(dplyr::across(
+          !"groupping",
+          ~ as.character(as.Date(round(.x), origin = "1970-01-01"))
+        ))
+    } else {
+      result.k <- result.k %>%
+        dplyr::mutate(dplyr::across(
+          !"groupping",
+          ~ base::format(
+            .x,
+            big.mark = bigMark,
+            decimal.mark = decimalMark,
+            nsmall = ifelse(.x %% 1 == 0, 0, significativeDecimals)
+          )
+        ))
+    }
+    result <- dplyr::union_all(
+      result,
+      result.k %>%
+        tidyr::pivot_longer(!"groupping", names_to = "variable") %>%
+        dplyr::mutate(
+          fun = .env$functions[k], variable_classification = "date"
+        )
+    )
+  }
+}
 }
 
 #' @noRd

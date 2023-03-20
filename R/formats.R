@@ -123,7 +123,7 @@ cleanTypes <- function(x, vt) {
     } else if (vt$variable_type[k] == "categorical") {
       x[[vt$variable[k]]] <- as.character(x[[vt$variable[k]]])
     } else if (vt$variable_type[k] == "date") {
-      x[[vt$variable[k]]] <- as.Date(x[[vt$variable[k]]])
+      x[[vt$variable[k]]] <- as.numeric(as.Date(x[[vt$variable[k]]]))
     }
   }
   return(x)

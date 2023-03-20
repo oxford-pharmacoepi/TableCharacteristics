@@ -92,9 +92,9 @@ tableCharacteristics <- function (
   ## start a tibble with all the variables and functions that should be applied
   variables <- dplyr::tibble(
     variable = character(),
-    fun = character(),
-    variable_type = character(),
-    format = character()
+    variable_classification = character(),
+    format = character(),
+    fun = character()
   )
   ## check other variables
   checkmate::assertList(otherVariables, types = "character")
@@ -105,7 +105,7 @@ tableCharacteristics <- function (
     t <- compatibleType(
       variableType %>%
         dplyr::filter(.data$variable %in% .env$otherVariables[[k]]) %>%
-        dplyr::pull("classification") %>%
+        dplyr::pull("variable_classification") %>%
         unique()
     )
     if (t == "incompatible") {
@@ -120,9 +120,9 @@ tableCharacteristics <- function (
       variables <- variables %>%
         dplyr::union_all(tidyr::expand_grid(
           variable = otherVariables[[k]],
-          fun = functions,
-          variable_type = t,
-          format = otherFormat[[k]]
+          variable_classification = t,
+          format = otherFormat[[k]],
+          fun = functions
         ))
     }
   }
@@ -157,7 +157,7 @@ tableCharacteristics <- function (
     checkmate::assertTRUE(all(
       variableType %>%
         dplyr::filter(.data$variable %in% .env$numericVariables) %>%
-        dplyr::pull("classification") %in%
+        dplyr::pull("variable_classification") %in%
         c("numeric", "binary")
     ))
     functions <- assertFormat(numericFormat, "numeric")
@@ -168,7 +168,7 @@ tableCharacteristics <- function (
         dplyr::union_all(tidyr::expand_grid(
           variable = numericVariables,
           fun = functions,
-          variable_type = "numeric",
+          variable_classification = "numeric",
           format = numericFormat
         ))
     }
@@ -181,7 +181,7 @@ tableCharacteristics <- function (
     checkmate::assertTRUE(all(
       variableType %>%
         dplyr::filter(.data$variable %in% .env$dateVariables) %>%
-        dplyr::pull("classification") == "date"
+        dplyr::pull("variable_classification") == "date"
     ))
     functions <- assertFormat(dateFormat, "date")
     if (length(functions) == 0) {
@@ -191,7 +191,7 @@ tableCharacteristics <- function (
         dplyr::union_all(tidyr::expand_grid(
           variable = dateVariables,
           fun = functions,
-          variable_type = "date",
+          variable_classification = "date",
           format = dateFormat
         ))
     }
@@ -204,7 +204,7 @@ tableCharacteristics <- function (
     checkmate::assertTRUE(all(
       variableType %>%
         dplyr::filter(.data$variable %in% .env$categoricalVariables) %>%
-        dplyr::pull("classification") == "categorical"
+        dplyr::pull("variable_classification") == "categorical"
     ))
     functions <- assertFormat(categoricalFormat, "categorical")
     if (length(functions) == 0) {
@@ -214,7 +214,7 @@ tableCharacteristics <- function (
         dplyr::union_all(tidyr::expand_grid(
           variable = categoricalVariables,
           fun = functions,
-          variable_type = "categorical",
+          variable_classification = "categorical",
           format = categoricalFormat
         ))
     }
@@ -227,7 +227,7 @@ tableCharacteristics <- function (
     checkmate::assertTRUE(all(
       variableType %>%
         dplyr::filter(.data$variable %in% .env$binaryVariables) %>%
-        dplyr::pull("classification") == "binary"
+        dplyr::pull("variable_classification") == "binary"
     ))
     functions <- assertFormat(binaryFormat, "binary")
     if (length(functions) == 0) {
@@ -237,7 +237,7 @@ tableCharacteristics <- function (
         dplyr::union_all(tidyr::expand_grid(
           variable = binaryVariables,
           fun = functions,
-          variable_type = "binary",
+          variable_classification = "binary",
           format = binaryFormat
         ))
     }
@@ -306,7 +306,13 @@ tableCharacteristics <- function (
 
   x <- cleanTypes(x, variables)
 
-  result <- summaryValues(x, variables, groupVariable)
+  result <- summaryValues(
+    x,
+    variables %>%
+      dplyr::select("variable", "variable_classification", "fun") %>%
+      dplyr::distinct(),
+    groupVariable
+  )
 
 }
 
@@ -386,11 +392,37 @@ variableTibble <- function(
 
 #' @noRd
 summaryValues <- function(x, variables, group) {
-  variableGroups <- variables %>%
-    dplyr::select("variable_type", "format") %>%
-    dplyr::distinct()
   if (!is.null(group)) {
     x <- x %>% dplyr::group_by(dplyr::all_of(group))
+  }
+  result <- dplyr::tibble(
+    variable = character(),
+    variable_classification = character(),
+    fun = character(),
+    value = character()
+  )
+  variablesNumeric <- variables %>%
+    dplyr::filter(.data$variable_type == "numeric")
+  if (nrow(variablesNumeric) > 0) {
+    functions <- variablesNumeric %>%
+      dplyr::pull("fun") %>%
+      unique()
+    for (k in seq_along(functions)) {
+      variablesFunction <- variablesNumeric %>%
+        dplyr::filter(.data$fun == .env$functions[k]) %>%
+        dplyr::pull("variables")
+      result <- result %>%
+        dplyr::union_all(
+          x %>%
+            dplyr::summarise(dplyr::across(
+              .cols = dplyr::all_of(.env$variablesFunction),
+              .fns = getFunctions(functions[k]),
+              .names = "{.col}"
+            ))
+        )
+    }
+      getFunctions()
+
   }
   result <- NULL
   for (k in 1:nrow(variableGroups)) {
@@ -759,7 +791,6 @@ getFunctions <- function(f) {
   )
   return(estimates_func[f])
 }
-
 
 #' referenceGroup <- lapply(referenceGroup)
 #' # check other variables --> list of characters

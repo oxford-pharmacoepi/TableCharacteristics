@@ -59,7 +59,7 @@ binaryFormats <- function() {
 #'
 #' @param x Tibble with different columns.
 #'
-#' @return Tibble with the variables classification
+#' @return Tibble with the variables type and classification
 #'
 #' @export
 #'
@@ -69,7 +69,7 @@ variableTypes <- function(x) {
     variable = colnames(x),
     variable_type = lapply(x, pillar::type_sum) %>% unlist()
   ) %>%
-    dplyr::mutate(classification = assertClassification(.data$variable_type, .env$x))
+    dplyr::mutate(variable_classification = assertClassification(.data$variable_type, .env$x))
   return(x)
 }
 

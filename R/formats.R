@@ -9,7 +9,7 @@
 #' @export
 #'
 numericFormats <- function() {
-  return(format("numeric"))
+  return(availableFormat("numeric"))
 }
 
 #' Available functions and formats for date variables
@@ -23,7 +23,7 @@ numericFormats <- function() {
 #' @export
 #'
 dateFormats <- function() {
-  return(format("date"))
+  return(availableFormat("date"))
 }
 
 #' Available functions and formats for categorical variables
@@ -37,7 +37,7 @@ dateFormats <- function() {
 #' @export
 #'
 categoricalFormats <- function() {
-  return(format("categorical"))
+  return(availableFormat("categorical"))
 }
 
 #' Available functions and formats for binary variables
@@ -51,7 +51,7 @@ categoricalFormats <- function() {
 #' @export
 #'
 binaryFormats <- function() {
-  return(format("binary"))
+  return(availableFormat("binary"))
 }
 
 #' Classify the variables between 5 types: "numeric", "categorical", "binary",
@@ -99,7 +99,7 @@ assertClassification <- function(x, tib) {
 }
 
 #' @noRd
-format <- function(x) {
+availableFormat <- function(x) {
   x <- formats %>%
     dplyr::filter(.data$type == .env$x) %>%
     dplyr::select(-"type")

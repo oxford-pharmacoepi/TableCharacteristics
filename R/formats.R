@@ -118,12 +118,14 @@ availableFormat <- function(x) {
 #' @noRd
 cleanTypes <- function(x, vt) {
   for (k in 1:nrow(vt)) {
-    if (vt$variable_type[k] %in% c("binary", "numeric")) {
+    if (vt$variable_classification[k] %in% c("binary", "numeric")) {
       x[[vt$variable[k]]] <- as.numeric(x[[vt$variable[k]]])
-    } else if (vt$variable_type[k] == "categorical") {
+    } else if (vt$variable_classification[k] == "categorical") {
       x[[vt$variable[k]]] <- as.character(x[[vt$variable[k]]])
-    } else if (vt$variable_type[k] == "date") {
-      x[[vt$variable[k]]] <- as.numeric(as.Date(x[[vt$variable[k]]]))
+    } else if (vt$variable_classification[k] == "date") {
+      x[[vt$variable[k]]] <- as.numeric(as.Date(
+        x[[vt$variable[k]]], origin = "1970-01-01"
+      ))
     }
   }
   return(x)

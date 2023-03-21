@@ -78,14 +78,20 @@ tableCharacteristics <- function (
   ## present
   if (!is.null(groupVariable)) {
     checkmate::assertTRUE(groupVariable %in% colnames(x))
-    checkmate::assertTRUE(length(referenceGroup) == 1)
-    groups <- x %>%
-      dplyr::select(dplyr::all_of(groupVariable)) %>%
-      dplyr::distinct() %>%
-      dplyr::pull()
-    checkmate::assertTRUE(referenceGroup %in% groups)
+    if (is.null(referenceGroup)) {
+      smd <- FALSE
+    } else {
+      groups <- x %>%
+        dplyr::select(dplyr::all_of(groupVariable)) %>%
+        dplyr::distinct() %>%
+        dplyr::pull()
+      checkmate::assertTRUE(length(referenceGroup) == 1)
+      checkmate::assertTRUE(referenceGroup %in% groups)
+      smd <- TRUE
+    }
   } else {
     checkmate::assertNull(referenceGroup)
+    smd <- FALSE
   }
   ## detect all variables type
   variableType <- variableTypes(x)
@@ -127,25 +133,25 @@ tableCharacteristics <- function (
     }
   }
   ## if variables groups are NA detect automatically
-  if (is.na(numericVariables)) {
+  if (length(numericVariables) == 1 && is.na(numericVariables)) {
     numericVariables <- variableType %>%
       dplyr::filter(!(.data$variable %in% variables$variable)) %>%
       dplyr::filter(.data$classification == "numeric") %>%
       dplyr::pull("variable")
   }
-  if (is.na(dateVariables)) {
+  if (length(dateVariables) == 1 && is.na(dateVariables)) {
     dateVariables <- variableType %>%
       dplyr::filter(!(.data$variable %in% variables$variable)) %>%
       dplyr::filter(.data$classification == "date") %>%
       dplyr::pull("variable")
   }
-  if (is.na(categoricalVariables)) {
+  if (length(categoricalVariables) == 1 && is.na(categoricalVariables)) {
     categoricalVariables <- variableType %>%
       dplyr::filter(!(.data$variable %in% variables$variable)) %>%
       dplyr::filter(.data$classification == "categorical") %>%
       dplyr::pull("variable")
   }
-  if (is.na(binaryVariables)) {
+  if (length(binaryVariables) == 1 && is.na(binaryVariables)) {
     binaryVariables <- variableType %>%
       dplyr::filter(!(.data$variable %in% variables$variable)) %>%
       dplyr::filter(.data$classification == "binary") %>%
@@ -311,88 +317,16 @@ tableCharacteristics <- function (
     variables %>%
       dplyr::select("variable", "variable_classification", "fun") %>%
       dplyr::distinct(),
-    groupVariable
+    groupVariable,
+    bigMark,
+    decimalMark,
+    significativeDecimals
   )
 
 }
 
-# variable function
-variableTibble <- function(
-    x,
-    variablesOrder,
-    variables,
-    formats
-) {
-  order <- dplyr::tibble(variable = order, order = dplyr::row_number())
-  variable_settings <- NULL
-  for (k in 1:length(variables)) {
-    variable_type <- variableType(x, variables[[k]])
-    variable_tibble_k <- dplyr::tibble(
-      variable = variables[[k]],
-      variable_type = variable_type
-    )
-    variable_settings <- variable_settings %>%
-      dplyr::union_all(
-        variable_tibble_k %>%
-          dplyr::left_join(
-            dplyr::tibble(variable_type = variable_type) %>%
-              dplyr::mutate(
-                smd_type = dplyr::if_else(
-                  .data$variable_type %in% c("numeric", "date"),
-                  "numeric",
-                  "categorical"
-                ),
-                format = strsplit(format[[k]], "\n")[[1]],
-                variable_group = k
-              ) %>%
-              dplyr::mutate(
-                functions = getFunctions(.data$format, .data$variable_type),
-                format = subFormat(.data$format, .data$variable_type),
-                number_lines = length(.data$format),
-                line_number = dplyr::row_number()
-              ),
-            by = "variable_type"
-          )
-      )
-  }
-  variable_settings <- variable_settings %>%
-    dplyr::mutate(
-      smd_type = dplyr::if_else(.data$number_lines > 1, NA, .data$smd_type)
-    ) %>%
-    dplyr::union_all(
-      variable_settings %>%
-        dplyr::filter(.data$number_lines > 1 & .data$line_number == 1) %>%
-        mutate(
-          line_number = 0,
-          functions = NA,
-          format = NA,
-        )
-    ) %>%
-    dplyr::inner_join(variable_settings, by = "variable") %>%
-    dplyr::arrange(.data$order, .data$line_number) %>%
-    dplyr::mutate(
-      variable_new_name = paste0("var", .data$order),
-      column_name = paste0("column", .data$order),
-      row_name = dplyr::if_else(
-        .data$number_lines == 1,
-        paste0(.data$variable, " ", .data$format),
-        dplyr::if_else(.data$line_number == 0, .data$variable, .data$format)
-      ),
-      content = dplyr::if_else(
-        is.na(.data$format),
-        NA,
-        gsub("#VAR#", .data$variable_new_name, .data$format)
-      )
-    )
-
-  #variable variable_type functions row_name variable_id column_name value smd
-  #age "age mean (sd)" var1 column_1 'paste0(.data$var1_mean, " (", .data$var1_sd, ")")' TRUE
-
-}
-
 #' @noRd
-summaryValues <- function(x, variables, bigMark, decimalMark, significativeDecimals) {
-  x <- x %>% dplyr::group_by(.data$groupping)
+summaryValues <- function(x, variables, groupVariable, bigMark, decimalMark, significativeDecimals) {
   result <- dplyr::tibble(
     variable = character(),
     variable_classification = character(),
@@ -404,290 +338,51 @@ summaryValues <- function(x, variables, bigMark, decimalMark, significativeDecim
   variablesNumeric <- variables %>%
     dplyr::filter(.data$variable_classification == "numeric")
   if (nrow(variablesNumeric) > 0) {
-    functions <- variablesNumeric %>%
-      dplyr::pull("fun") %>%
-      unique()
-    for (k in seq_along(functions)) {
-      variablesFunction <- variablesNumeric %>%
-        dplyr::filter(.data$fun == .env$functions[k]) %>%
-        dplyr::pull("variable")
-      result.k <- x %>%
-        dplyr::summarise(dplyr::across(
-          .cols = dplyr::all_of(.env$variablesFunction),
-          .fns = getFunctions(functions[k]),
-          .names = "{.col}"
-        ))
-      if (is.null(group)) {
-        result.k <- dplyr::mutate(result.k, groupping = NA)
-      } else {
-        result.k <- dplyr::rename("groupping" = dplyr::all_of(group))
-      }
-      result.k <- result.k %>%
-        dplyr::mutate(dplyr::across(
-          !"groupping",
-          ~ base::format(
-            .x,
-            big.mark = bigMark,
-            decimal.mark = decimalMark,
-            nsmall = ifelse(.x %% 1 == 0, 0, significativeDecimals)
-          )
-        )) %>%
-        tidyr::pivot_longer(!"groupping", names_to = "variable") %>%
-        dplyr::mutate(
-          fun = .env$functions[k], variable_classification = "numeric"
-        )
-      result <- dplyr::union_all(result, result.k)
-    }
+    result <- dplyr::union_all(
+      result,
+      getNumericValues(
+        x, variablesNumeric, groupVariable, bigMark, decimalMark,
+        significativeDecimals
+      )
+    )
   }
   # date variables
   variablesDate <- variables %>%
     dplyr::filter(.data$variable_classification == "date")
   if (nrow(variablesDate) > 0) {
-    functions <- variablesDate %>%
-      dplyr::pull("fun") %>%
-      unique()
-    for (k in seq_along(functions)) {
-      variablesFunction <- variablesDate %>%
-        dplyr::filter(.data$fun == .env$functions[k]) %>%
-        dplyr::pull("variable")
-      result.k <- x %>%
-        dplyr::summarise(dplyr::across(
-          .cols = dplyr::all_of(.env$variablesFunction),
-          .fns = getFunctions(functions[k]),
-          .names = "{.col}"
-        ))
-      if (is.null(group)) {
-        result.k <- dplyr::mutate(result.k, groupping = NA)
-      } else {
-        result.k <- dplyr::rename("groupping" = dplyr::all_of(group))
-      }
-      if (dateFromats()$result[dateFormats()$format_key == functions[k]] == "date") {
-        result.k <- result.k %>%
-          dplyr::mutate(dplyr::across(
-            !"groupping",
-            ~ as.character(as.Date(round(.x), origin = "1970-01-01"))
-          ))
-      } else {
-        result.k <- result.k %>%
-          dplyr::mutate(dplyr::across(
-            !"groupping",
-            ~ base::format(
-              .x,
-              big.mark = bigMark,
-              decimal.mark = decimalMark,
-              nsmall = ifelse(.x %% 1 == 0, 0, significativeDecimals)
-            )
-          ))
-      }
-      result <- dplyr::union_all(
-        result,
-        result.k %>%
-          tidyr::pivot_longer(!"groupping", names_to = "variable") %>%
-          dplyr::mutate(
-            fun = .env$functions[k], variable_classification = "date"
-          )
+    result <- dplyr::union_all(
+      result,
+      getDateValues(
+        x, variablesDate, groupVariable, bigMark, decimalMark,
+        significativeDecimals
       )
-    }
+    )
   }
   # binary variables
   variablesBinary <- variables %>%
     dplyr::filter(.data$variable_classification == "binary")
   if (nrow(variablesBinary) > 0) {
-    variablesFunction <- variablesBinary %>%
-      dplyr::pull("variable") %>%
-      unique()
-    result <- result %>%
-      dplyr::union_all(
-        x %>%
-          dplyr::summarise(dplyr::across(
-            .cols = dplyr::all_of(.env$variablesFunction),
-            .fns = list("sum" = function(x) {sum(x)}),
-            .names = "{.col}"
-          )) %>%
-          tidyr::pivot_longer(
-            !"groupping", names_to = "variable", values_to = "count"
-          ) %>%
-          dplyr::inner_join(
-            x %>%
-              dplyr::summarise(denominator = as.numeric(dplyr::n())),
-            by = "groupping"
-          ) %>%
-          dplyr::mutate("%" = 100 * .data$count / .data$denominator) %>%
-          dplyr::mutate(
-            "%" = base::paste0(
-              base::format(
-                .data[["%"]],
-                big.mark = bigMark,
-                decimal.mark = decimalMark,
-                nsmall = ifelse(.data[["%"]] %% 1 == 0, 0, significativeDecimals)
-              ),
-              "%"
-            ),
-            count = base::format(
-              .data$count,
-              big.mark = bigMark,
-              decimal.mark = decimalMark,
-              nsmall = ifelse(.data$count %% 1 == 0, 0, significativeDecimals)
-            )
-          ) %>%
-          tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%
-          dplyr::select(-"denominator") %>%
-          dplyr::inner_join(
-            variablesBinary %>%
-              dplyr::select("variable", "variable_classification", "fun"),
-            by = c("variable", "fun")
-          )
+    result <- dplyr::union_all(
+      result,
+      getBinaryValues(
+        x, variablesBinary, groupVariable, bigMark, decimalMark,
+        significativeDecimals
       )
+    )
   }
   # categorical variables
   variablesCategorical <- variables %>%
     dplyr::filter(.data$variable_classification == "categorical")
   if (nrow(variablesCategorical) > 0) {
-    functions <- variablesCategorical %>%
-      dplyr::pull("fun") %>%
-      unique()
-    result.k <- dplyr::tibble(
-      variable = character(),
-      variable_classification = character(),
-      fun = character(),
-      value = character(),
-      groupping = character()
-    )
-    if ("count" %in% functions || "%" %in% functions ) {
-      variablesFunction <- variablesCategorical %>%
-        dplyr::filter(.data$fun %in% c("count", "%")) %>%
-        dplyr::pull("variable") %>%
-        unique()
-      denominator <- x %>%
-        dplyr::group_by(.data$groupping) %>%
-        dplyr::summarise(denominator = as.numeric(dplyr::n()), .groups = "drop")
-      for (k in seq_along(variablesFunction)) {
-        categories <- x %>%
-          dplyr::select("category" = dplyr::all_of(variablesFunction[k])) %>%
-          dplyr::distinct()
-        result.k <- result.k %>%
-          dplyr::union_all(
-            x %>%
-              dplyr::rename("category" = dplyr::all_of(variablesFunction[k])) %>%
-              dplyr::group_by(.data$groupping, .data$category) %>%
-              dplyr::summarise(count = as.numeric(dplyr::n()), .groups = "drop") %>%
-              dplyr::right_join(categories, by = "category") %>%
-              dplyr::mutate(count = dplyr::if_else(
-                is.na(.data$count), 0, .data$count
-              )) %>%
-              dplyr::inner_join(denominator, by = "groupping") %>%
-              dplyr::mutate("%" = 100 * .data$count / .data$denominator) %>%
-              dplyr::mutate(
-                "%" = base::paste0(
-                  base::format(
-                    .data[["%"]],
-                    big.mark = bigMark,
-                    decimal.mark = decimalMark,
-                    nsmall = ifelse(.data[["%"]] %% 1 == 0, 0, significativeDecimals)
-                  ),
-                  "%"
-                ),
-                count = base::format(
-                  .data$count,
-                  big.mark = bigMark,
-                  decimal.mark = decimalMark,
-                  nsmall = ifelse(.data$count %% 1 == 0, 0, significativeDecimals)
-                )
-              ) %>%
-              dplyr::mutate(
-                count = paste0(.data$category, ": ", .data$count),
-                "%" = paste0(.data$category, ": ", .data[["%"]])
-              ) %>%
-              dplyr::select(-c("denominator", "category")) %>%
-              tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%
-              dplyr::inner_join(
-                variablesCategorical %>%
-                  dplyr::filter(.data$variable == .env$variablesFunction[k]) %>%
-                  dplyr::filter(.data$fun %in% c("count", "%")) %>%
-                  dplyr::select("variable", "variable_classification", "fun"),
-                by = "fun"
-              )
-          )
-
-
-      }
-    }
-    if ("distinct" %in% functions) {
-      variablesFunction <- variablesCategorical %>%
-        dplyr::filter(.data$fun == "distinct") %>%
-        dplyr::pull("variable")
-      result.k <- result.k %>%
-        dplyr::union_all(
-          x %>%
-            dplyr::group_by(.data$groupping) %>%
-            dplyr::summarise(dplyr::across(
-              dplyr::all_of(variablesFunction),
-              list("distinct" = function(x){dplyr::n_distinct(x)}),
-              .names = "{.col}"
-            )) %>%
-            tidyr::pivot_longer(!"groupping", names_to = "variable") %>%
-            dplyr::mutate(value = format(
-              round(.data$value), big.mark = bigMark
-            )) %>%
-            dplyr::mutate(fun = "distinct", variable_classification = "categorical")
-        )
-    }
-    variablesCategorical <- variablesCategorical %>%
-      dplyr::filter(!(.data$fun %in% c("count", "%", "distinct")))
-    variablesFunction <- variablesCategorical %>%
-      dplyr::pull("variable") %>%
-      unique()
-    for (k in seq_along(variablesFunction)) {
-      functions <- variablesCategorical %>%
-        dplyr::filter(.data$variable == .env$variablesFunction[k]) %>%
-        dplyr::pull("fun")
-      categories <- x %>%
-        dplyr::pull(dplyr::all_of(variablesFunction[k])) %>%
-        unique()
-      groups <- x %>%
-        dplyr::pull("groupping") %>%
-        unique()
-      categories <- tidyr::expand_grid(
-        groupping = groups,
-        category = categories
+    result <- dplyr::union_all(
+      result,
+      getCategoricalValues(
+        x, variablesCategorical, groupVariable, bigMark, decimalMark,
+        significativeDecimals
       )
-      result.k <- result.k %>%
-        dplyr::union_all(
-          x %>%
-            dplyr::select(
-              "groupping", "category" = dplyr::all_of(variablesFunction[k])
-            ) %>%
-            dplyr::group_by(.data$groupping, .data$category) %>%
-            dplyr::summarise(count_per_category = dplyr::n(), .groups = "drop") %>%
-            dplyr::right_join(categories, by = c("groupping", "category")) %>%
-            dplyr::mutate(count_per_category = dplyr::if_else(
-              is.na(.data$count_per_category), 0, .data$count_per_category
-            )) %>%
-            dplyr::group_by(.data$groupping) %>%
-            dplyr::summarise(dplyr::across(
-              .cols = "count_per_category",
-              .fns = getFunctions(functions),
-              .names = "{.fn}"
-            )) %>%
-            tidyr::pivot_longer(!"groupping", names_to = "fun") %>%
-            dplyr::mutate(
-              variable = .env$variablesFunction[k],
-              variable_classification = "categorical"
-            ) %>%
-            dplyr::mutate(
-              value = base::format(
-                .data$value,
-                big.mark = bigMark,
-                decimal.mark = decimalMark,
-                nsmall = ifelse(.data$value %% 1 == 0, 0, significativeDecimals)
-              )
-            )
-        )
-    }
-
+    )
   }
 }
-
 
 #' @noRd
 getFunctions <- function(f) {
@@ -1014,46 +709,369 @@ getFunctions <- function(f) {
   return(estimates_func[f])
 }
 
-#' referenceGroup <- lapply(referenceGroup)
-#' # check other variables --> list of characters
-#' # check that grouping + variables is present
-#' if (is.na(numericVariables)) {
-#'   numericVariables <- findNumericVariables(x)
-#' }
-#' variables <- c(
-#'   grouping, numericVariables, dateVariables, categoricalVariables,
-#'   binaryVariables, unlist(otherVariables)
-#' )
-#' variablesPresence <- variables %in% colnames(x)
-#' if (!all(variablesPresence)) {
-#'   errorVariables <- paste0(variables[!variablesPresence], collapse = ", ")
-#'   stop(paste0("Variables: ", errorVariables, " are not present in x."))
-#' }
-#' if (is.null(order)) {
-#'   order <- colnames(x)
-#'   order <- order[order %in% variables]
-#' }
-#'
-#' values <- summaryValues(x, variables)
-#'
-#' if (!is.null(numericVariables)) {
-#'   functions <- findFunctions(numericFormat)
-#'   numericSummary <- x %>%
-#'     summarise(functions, variables, ungroup)
-#'   # group, variable, function, result
-#' }
-#'
-#' #' add percentages and formats to each number
-#'
-#' formats <- ""
-#' ln <- 1
-#' for (variable in order) {
-#'   for (format in formats[[variable]]) {
-#'     format <- gsub("var", paste0(".data$", variable), format)
-#'     result <- result %>%
-#'       mutate(paset0("line_", ln) := paste0(
-#'       ))
-#'     ln <- ln + 1
-#'   }
-#' }
+#' @noRd
+niceNum <- function(x, bigMark, decimalMark, significativeDecimals) {
+  base::format(
+    .x,
+    big.mark = bigMark,
+    decimal.mark = decimalMark,
+    nsmall = ifelse(.x %% 1 == 0, 0, significativeDecimals)
+  )
+}
 
+#' @noRd
+getNumericValues <- function(x, variables, groupVariable, bigMark, decimalMark, significativeDecimals) {
+  functions <- variablesNumeric %>%
+    dplyr::pull("fun") %>%
+    unique()
+  result <- dplyr::tibble(
+    variable = character(),
+    variable_classification = character(),
+    fun = character(),
+    value = character(),
+    groupping = character()
+  )
+  for (k in seq_along(functions)) {
+    variablesFunction <- variablesNumeric %>%
+      dplyr::filter(.data$fun == .env$functions[k]) %>%
+      dplyr::pull("variable")
+    result.k <- x %>%
+      dplyr::group_by(dplyr::all_of(groupVariable)) %>%
+      dplyr::summarise(dplyr::across(
+        .cols = dplyr::all_of(variablesFunction),
+        .fns = getFunctions(functions[k]),
+        .names = "{.col}"
+      )) %>%
+      dplyr::mutate(dplyr::across(
+        dplyr::all_of(variablesFunction),
+        ~ niceNum(.x, bigMark, decimalMark, significativeDecimals)
+      )) %>%
+      tidyr::pivot_longer(
+        dplyr::all_of(variablesFunction), names_to = "variable"
+      ) %>%
+      dplyr::mutate(
+        fun = .env$functions[k], variable_classification = "numeric"
+      )
+    if (is.null(groupVariable)) {
+      result.k <- dplyr::mutate(result.k, "groupping" = NA)
+    } else {
+      result.k <- result.k %>%
+        dplyr::rename("groupping" = dplyr::all_of(variablesFunction))
+    }
+    result <- dplyr::union_all(result, result.k)
+  }
+  return(result)
+}
+
+#' @noRd
+getDateValues <- function(x, variablesDate, groupVariable, bigMark, decimalMark, significativeDecimals) {
+  functions <- variablesDate %>%
+    dplyr::pull("fun") %>%
+    unique()
+  result <- dplyr::tibble(
+    variable = character(),
+    variable_classification = character(),
+    fun = character(),
+    value = character(),
+    groupping = character()
+  )
+  for (k in seq_along(functions)) {
+    variablesFunction <- variablesDate %>%
+      dplyr::filter(.data$fun == .env$functions[k]) %>%
+      dplyr::pull("variable")
+    result.k <- x %>%
+      dplyr::group_by(dplyr::all_of(groupVariable)) %>%
+      dplyr::summarise(dplyr::across(
+        .cols = dplyr::all_of(variablesFunction),
+        .fns = getFunctions(functions[k]),
+        .names = "{.col}"
+      ))
+    if (dateFromats()$result[dateFormats()$format_key == functions[k]] == "date") {
+      result.k <- result.k %>%
+        dplyr::mutate(dplyr::across(
+          dplyr::all_of(variablesFunction),
+          ~ as.character(as.Date(round(.x), origin = "1970-01-01"))
+        ))
+    } else {
+      result.k <- result.k %>%
+        dplyr::mutate(dplyr::across(
+          dplyr::all_of(variablesFunction),
+          ~ niceNum(.x, bigMark, decimalMark, significativeDecimals)
+        ))
+    }
+    result.k <- result.k %>%
+      tidyr::pivot_longer(dplyr::all_of(variablesFunction), names_to = "variable") %>%
+      dplyr::mutate(
+        fun = .env$functions[k], variable_classification = "date"
+      )
+    if (is.null(groupVariable)) {
+      result.k <- dplyr::mutate(result.k, "groupping" = NA)
+    } else {
+      result.k <- result.k %>%
+        dplyr::rename("groupping" = dplyr::all_of(variablesFunction))
+    }
+    result <- dplyr::union_all(result, result.k)
+  }
+  return(result)
+}
+
+#' @noRd
+getBinaryValues <- function(x, variablesBinary, groupVariable, bigMark, decimalMark, significativeDecimals) {
+  variablesFunction <- variablesBinary %>%
+    dplyr::pull("variable") %>%
+    unique()
+  result <- x %>%
+    dplyr::group_by(dplyr::all_of(groupVariable)) %>%
+    dplyr::summarise(dplyr::across(
+      .cols = dplyr::all_of(variablesFunction),
+      .fns = list("sum" = function(x) {sum(x)}),
+      .names = "{.col}"
+    )) %>%
+    tidyr::pivot_longer(
+      dplyr::all_of(variablesFunction),
+      names_to = "variable",
+      values_to = "count"
+    ) %>%
+    dplyr::mutate(denominator = as.numeric(dplyr::n())) %>%
+    dplyr::mutate("%" = 100 * .data$count / .data$denominator) %>%
+    dplyr::mutate(
+      "%" = base::paste0(
+        niceNum(.data[["%"]], bigMark, decimalMark, significativeDecimals),
+        "%"
+      ),
+      count = niceNum(.data$count, bigMark, decimalMark, significativeDecimals)
+    ) %>%
+    dplyr::select(-"denominator") %>%
+    tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%
+    dplyr::inner_join(
+      variablesBinary %>%
+        dplyr::select("variable", "variable_classification", "fun"),
+      by = c("variable", "fun")
+    )
+  if (is.null(groupVariable)) {
+    result <- dplyr::mutate(result, "groupping" = NA)
+  } else {
+    result <- result %>%
+      dplyr::rename("groupping" = dplyr::all_of(variablesFunction))
+  }
+  return(result)
+}
+
+#' @noRd
+getCategoricalValues <- function(x, variablesCategorical, groupVariable, bigMark, decimalMark, significativeDecimals) {
+  functions <- variablesCategorical %>%
+    dplyr::pull("fun") %>%
+    unique()
+  result <- dplyr::tibble(
+    variable = character(),
+    variable_classification = character(),
+    fun = character(),
+    value = character(),
+    groupping = character()
+  )
+  if ("count" %in% functions || "%" %in% functions ) {
+    variablesFunction <- variablesCategorical %>%
+      dplyr::filter(.data$fun %in% c("count", "%")) %>%
+      dplyr::pull("variable") %>%
+      unique()
+    for (k in seq_along(variablesFunction)) {
+      categories <- x %>%
+        dplyr::select("category" = dplyr::all_of(variablesFunction[k])) %>%
+        dplyr::distinct()
+      result <- result %>%
+        dplyr::union_all(
+          x %>%
+            dplyr::rename("category" = dplyr::all_of(variablesFunction[k])) %>%
+            dplyr::group_by(dplyr::all_of(groupVariable), .data$category) %>%
+            dplyr::summarise(count = as.numeric(dplyr::n()), .groups = "drop") %>%
+            dplyr::right_join(categories, by = "category") %>%
+            dplyr::mutate(count = dplyr::if_else(
+              is.na(.data$count), 0, .data$count
+            )) %>%
+            dplyr::mutate(denominator = as.numeric(dplyr::n())) %>%
+            dplyr::mutate("%" = 100 * .data$count / .data$denominator) %>%
+            dplyr::mutate(
+              "%" = base::paste0(
+                niceNum(
+                  .data[["%"]], bigMark, decimalMark, significativeDecimals
+                ),
+                "%"
+              ),
+              count = niceNum(
+                .data$count, bigMark, decimalMark, significativeDecimals
+              )
+            ) %>%
+            dplyr::mutate(
+              count = paste0(.data$category, ": ", .data$count),
+              "%" = paste0(.data$category, ": ", .data[["%"]])
+            ) %>%
+            dplyr::select(-c("denominator", "category")) %>%
+            tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%
+            dplyr::inner_join(
+              variablesCategorical %>%
+                dplyr::filter(.data$variable == .env$variablesFunction[k]) %>%
+                dplyr::filter(.data$fun %in% c("count", "%")) %>%
+                dplyr::select("variable", "variable_classification", "fun"),
+              by = "fun"
+            )
+        )
+    }
+  }
+  if ("distinct" %in% functions) {
+    variablesFunction <- variablesCategorical %>%
+      dplyr::filter(.data$fun == "distinct") %>%
+      dplyr::pull("variable")
+    result <- result %>%
+      dplyr::union_all(
+        x %>%
+          dplyr::group_by(dplyr::all_of(groupVariable)) %>%
+          dplyr::summarise(dplyr::across(
+            dplyr::all_of(variablesFunction),
+            list("distinct" = function(x){dplyr::n_distinct(x)}),
+            .names = "{.col}"
+          )) %>%
+          tidyr::pivot_longer(
+            dplyr::all_of(variablesFunction), names_to = "variable"
+          ) %>%
+          dplyr::mutate(value = format(
+            round(.data$value), big.mark = bigMark
+          )) %>%
+          dplyr::mutate(
+            fun = "distinct", variable_classification = "categorical"
+          )
+      )
+  }
+  variablesCategorical <- variablesCategorical %>%
+    dplyr::filter(!(.data$fun %in% c("count", "%", "distinct")))
+  variablesFunction <- unique(variablesCategorical$variable)
+  for (k in seq_along(variablesFunction)) {
+    functions <- variablesCategorical %>%
+      dplyr::filter(.data$variable == .env$variablesFunction[k]) %>%
+      dplyr::pull("fun")
+    categories <- x %>%
+      dplyr::pull(dplyr::all_of(variablesFunction[k])) %>%
+      unique()
+    if (is.null(groupVariable)) {
+      categories <- dplyr::tibble(category = categories)
+      toJoin <- "category"
+    } else {
+      groups <- x %>%
+        dplyr::pull(dplyr::all_of(groupVariable)) %>%
+        unique()
+      categories <- tidyr::expand_grid(
+        !!groupVariable := groups,
+        category = categories
+      )
+      toJoin <- c(groupVariable, "category")
+    }
+    result <- result %>%
+      dplyr::union_all(
+        x %>%
+          dplyr::select(
+            dplyr::all_of(groupVariable),
+            "category" = dplyr::all_of(variablesFunction[k])
+          ) %>%
+          dplyr::group_by(dplyr::all_of(groupVariable), .data$category) %>%
+          dplyr::summarise(count_per_category = dplyr::n(), .groups = "drop") %>%
+          dplyr::right_join(categories, by = dplyr::all_of(toJoin)) %>%
+          dplyr::mutate(count_per_category = dplyr::if_else(
+            is.na(.data$count_per_category), 0, .data$count_per_category
+          )) %>%
+          dplyr::group_by(dplyr::all_of(groupVariable)) %>%
+          dplyr::summarise(dplyr::across(
+            .cols = "count_per_category",
+            .fns = getFunctions(functions),
+            .names = "{.fn}"
+          )) %>%
+          tidyr::pivot_longer(dplyr::all_of(functions), names_to = "fun") %>%
+          dplyr::mutate(
+            variable = .env$variablesFunction[k],
+            variable_classification = "categorical"
+          ) %>%
+          dplyr::mutate(value = niceNum(
+            .data$value, bigMark, decimalMark, significativeDecimals
+          ))
+      )
+  }
+  if (is.null(groupVariable)) {
+    result <- dplyr::mutate(result, "groupping" = NA)
+  } else {
+    result <- result %>%
+      dplyr::rename("groupping" = dplyr::all_of(variablesFunction))
+  }
+  return(result)
+}
+
+# variable function
+variableTibble <- function(
+    x,
+    variablesOrder,
+    variables,
+    formats
+) {
+  order <- dplyr::tibble(variable = order, order = dplyr::row_number())
+  variable_settings <- NULL
+  for (k in 1:length(variables)) {
+    variable_type <- variableType(x, variables[[k]])
+    variable_tibble_k <- dplyr::tibble(
+      variable = variables[[k]],
+      variable_type = variable_type
+    )
+    variable_settings <- variable_settings %>%
+      dplyr::union_all(
+        variable_tibble_k %>%
+          dplyr::left_join(
+            dplyr::tibble(variable_type = variable_type) %>%
+              dplyr::mutate(
+                smd_type = dplyr::if_else(
+                  .data$variable_type %in% c("numeric", "date"),
+                  "numeric",
+                  "categorical"
+                ),
+                format = strsplit(format[[k]], "\n")[[1]],
+                variable_group = k
+              ) %>%
+              dplyr::mutate(
+                functions = getFunctions(.data$format, .data$variable_type),
+                format = subFormat(.data$format, .data$variable_type),
+                number_lines = length(.data$format),
+                line_number = dplyr::row_number()
+              ),
+            by = "variable_type"
+          )
+      )
+  }
+  variable_settings <- variable_settings %>%
+    dplyr::mutate(
+      smd_type = dplyr::if_else(.data$number_lines > 1, NA, .data$smd_type)
+    ) %>%
+    dplyr::union_all(
+      variable_settings %>%
+        dplyr::filter(.data$number_lines > 1 & .data$line_number == 1) %>%
+        mutate(
+          line_number = 0,
+          functions = NA,
+          format = NA,
+        )
+    ) %>%
+    dplyr::inner_join(variable_settings, by = "variable") %>%
+    dplyr::arrange(.data$order, .data$line_number) %>%
+    dplyr::mutate(
+      variable_new_name = paste0("var", .data$order),
+      column_name = paste0("column", .data$order),
+      row_name = dplyr::if_else(
+        .data$number_lines == 1,
+        paste0(.data$variable, " ", .data$format),
+        dplyr::if_else(.data$line_number == 0, .data$variable, .data$format)
+      ),
+      content = dplyr::if_else(
+        is.na(.data$format),
+        NA,
+        gsub("#VAR#", .data$variable_new_name, .data$format)
+      )
+    )
+
+  #variable variable_type functions row_name variable_id column_name value smd
+  #age "age mean (sd)" var1 column_1 'paste0(.data$var1_mean, " (", .data$var1_sd, ")")' TRUE
+
+}

@@ -391,10 +391,8 @@ variableTibble <- function(
 }
 
 #' @noRd
-summaryValues <- function(x, variables, group) {
-  if (!is.null(group)) {
-    x <- x %>% dplyr::group_by(dplyr::all_of(group))
-  }
+summaryValues <- function(x, variables, bigMark, decimalMark, significativeDecimals) {
+  x <- x %>% dplyr::group_by(.data$groupping)
   result <- dplyr::tibble(
     variable = character(),
     variable_classification = character(),
@@ -498,46 +496,152 @@ summaryValues <- function(x, variables, group) {
     variablesFunction <- variablesBinary %>%
       dplyr::pull("variable") %>%
       unique()
-    result.k <- x %>%
-      dplyr::summarise(dplyr::across(
-        .cols = dplyr::all_of(.env$variablesFunction),
-        .fns = list("sum" = function(x) {sum(x)}),
-        .names = "{.col}"
-      ))
-    if (is.null(group)) {
-      result.k <- dplyr::mutate(result.k, groupping = NA)
-    } else {
-      result.k <- dplyr::rename("groupping" = dplyr::all_of(group))
-    }
-    if (dateFromats()$result[dateFormats()$format_key == functions[k]] == "date") {
-      result.k <- result.k %>%
-        dplyr::mutate(dplyr::across(
-          !"groupping",
-          ~ as.character(as.Date(round(.x), origin = "1970-01-01"))
-        ))
-    } else {
-      result.k <- result.k %>%
-        dplyr::mutate(dplyr::across(
-          !"groupping",
-          ~ base::format(
-            .x,
+    result <- result %>%
+      dplyr::union_all(
+        x %>%
+          dplyr::summarise(dplyr::across(
+            .cols = dplyr::all_of(.env$variablesFunction),
+            .fns = list("sum" = function(x) {sum(x)}),
+            .names = "{.col}"
+          )) %>%
+          tidyr::pivot_longer(
+            !"groupping", names_to = "variable", values_to = "count"
+          ) %>%
+          dplyr::inner_join(
+            x %>%
+              dplyr::summarise(denominator = as.numeric(dplyr::n())),
+            by = "groupping"
+          ) %>%
+          dplyr::mutate("%" = 100 * .data$count / .data$denominator) %>%
+          dplyr::mutate(
+            "%" = base::paste0(
+              base::format(
+                .data[["%"]],
+                big.mark = bigMark,
+                decimal.mark = decimalMark,
+                nsmall = ifelse(.data[["%"]] %% 1 == 0, 0, significativeDecimals)
+              ),
+              "%"
+            ),
+            count = base::format(
+              .data$count,
+              big.mark = bigMark,
+              decimal.mark = decimalMark,
+              nsmall = ifelse(.data$count %% 1 == 0, 0, significativeDecimals)
+            )
+          ) %>%
+          tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%
+          dplyr::select(-"denominator") %>%
+          dplyr::inner_join(
+            variablesBinary %>%
+              dplyr::select("variable", "variable_classification", "fun"),
+            by = c("variable", "fun")
+          )
+      )
+  }
+  # categorical variables
+  variablesCategorical <- variables %>%
+    dplyr::filter(.data$variable_classification == "categorical")
+  if (nrow(variablesCategorical) > 0) {
+    functions <- variablesCategorical %>%
+      dplyr::pull("fun") %>%
+      unique()
+    result.k <- dplyr::tibble(
+      variable = character(),
+      variable_classification = character(),
+      fun = character(),
+      value = character(),
+      groupping = character()
+    )
+    if ("count" %in% functions || "%" %in% functions ) {
+      x %>%
+        dplyr::summarise(dplyr::across(
+          .cols = dplyr::all_of(.env$variablesFunction),
+          .fns = list("sum" = function(x) {sum(x)}),
+          .names = "{.col}"
+        )) %>%
+        tidyr::pivot_longer(
+          !"groupping", names_to = "variable", values_to = "count"
+        ) %>%
+        dplyr::inner_join(
+          x %>%
+            dplyr::summarise(denominator = as.numeric(dplyr::n())),
+          by = "groupping"
+        ) %>%
+        dplyr::mutate("%" = 100 * .data$count / .data$denominator) %>%
+        dplyr::mutate(
+          "%" = base::paste0(
+            base::format(
+              .data[["%"]],
+              big.mark = bigMark,
+              decimal.mark = decimalMark,
+              nsmall = ifelse(.data[["%"]] %% 1 == 0, 0, significativeDecimals)
+            ),
+            "%"
+          ),
+          count = base::format(
+            .data$count,
             big.mark = bigMark,
             decimal.mark = decimalMark,
-            nsmall = ifelse(.x %% 1 == 0, 0, significativeDecimals)
+            nsmall = ifelse(.data$count %% 1 == 0, 0, significativeDecimals)
           )
-        ))
-    }
-    result <- dplyr::union_all(
-      result,
-      result.k %>%
-        tidyr::pivot_longer(!"groupping", names_to = "variable") %>%
-        dplyr::mutate(
-          fun = .env$functions[k], variable_classification = "date"
+        ) %>%
+        tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%
+        dplyr::select(-"denominator") %>%
+        dplyr::inner_join(
+          variablesBinary %>%
+            dplyr::select("variable", "variable_classification", "fun"),
+          by = c("variable", "fun")
         )
-    )
+    }
+    variablesFunction <- variablesCategorical %>%
+      dplyr::pull("variable") %>%
+      unique()
+    result <- result %>%
+      dplyr::union_all(
+        x %>%
+          dplyr::summarise(dplyr::across(
+            .cols = dplyr::all_of(.env$variablesFunction),
+            .fns = list("sum" = function(x) {sum(x)}),
+            .names = "{.col}"
+          )) %>%
+          tidyr::pivot_longer(
+            !"groupping", names_to = "variable", values_to = "count"
+          ) %>%
+          dplyr::inner_join(
+            x %>%
+              dplyr::summarise(denominator = as.numeric(dplyr::n())),
+            by = "groupping"
+          ) %>%
+          dplyr::mutate("%" = 100 * .data$count / .data$denominator) %>%
+          dplyr::mutate(
+            "%" = base::paste0(
+              base::format(
+                .data[["%"]],
+                big.mark = bigMark,
+                decimal.mark = decimalMark,
+                nsmall = ifelse(.data[["%"]] %% 1 == 0, 0, significativeDecimals)
+              ),
+              "%"
+            ),
+            count = base::format(
+              .data$count,
+              big.mark = bigMark,
+              decimal.mark = decimalMark,
+              nsmall = ifelse(.data$count %% 1 == 0, 0, significativeDecimals)
+            )
+          ) %>%
+          tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%
+          dplyr::select(-"denominator") %>%
+          dplyr::inner_join(
+            variablesBinary %>%
+              dplyr::select("variable", "variable_classification", "fun"),
+            by = c("variable", "fun")
+          )
+      )
   }
 }
-}
+
 
 #' @noRd
 getFunctions <- function(f) {
@@ -864,17 +968,6 @@ getFunctions <- function(f) {
   return(estimates_func[f])
 }
 
-#' @noRd
-correctFormat <- function(x, bigMark, decimalMark, significativeDecimals) {
-  if (is.numeric(x)) {
-    format(
-      x,
-      big.mark = bigMark,
-      decimal.mark = decimalMark,
-      nsmall = ifelse(x %% 1 == 0, 0, 2)
-    )
-  }
-}
 #' referenceGroup <- lapply(referenceGroup)
 #' # check other variables --> list of characters
 #' # check that grouping + variables is present

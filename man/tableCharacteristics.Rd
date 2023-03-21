@@ -13,7 +13,7 @@ tableCharacteristics(
   numericVariables = NA,
   numericFormat = "median [q25 - q75]",
   dateVariables = NA,
-  dateFromat = "median [min - max]",
+  dateFormat = "median [min - max]",
   categoricalVariables = NA,
   categoricalFormat = "count (\%)",
   binaryVariables = NA,
@@ -23,7 +23,7 @@ tableCharacteristics(
   groupNames = list(),
   order = NULL,
   bigMark = ",",
-  decimal = ".",
+  decimalMark = ".",
   significativeDecimals = 2
 )
 }
@@ -45,6 +45,9 @@ for the available options. More information in xxx vignette.}
 
 \item{dateVariables}{Variables included in the date group. If NA they are
 detected automatically see variableTypes(). If NULL this group is not used.}
+
+\item{dateFormat}{Format for the numericVariables. See dateFormats()
+for the available options. More information in xxx vignette.}
 
 \item{categoricalVariables}{Variables included in the categorical group. If
 NA they are detected automatically see variableTypes(). If NULL this group is
@@ -75,13 +78,10 @@ order. If NA they are sorted alphabetically.}
 
 \item{bigMark}{Thousands separator.}
 
-\item{decimal}{Decimal separator.}
+\item{decimalMark}{Decimal separator.}
 
 \item{significativeDecimals}{Number of significant decimals for numeric (non
 integer data)}
-
-\item{dateFormat}{Format for the numericVariables. See dateFormats()
-for the available options. More information in xxx vignette.}
 }
 \value{
 Tibble with the characteristics of the different groups
@@ -90,9 +90,4 @@ Tibble with the characteristics of the different groups
 Function to compute a nice table one that summarises the characteristics of
 by groups. Groups can be compared between them adding absolute standardized
 mean differences statistics.
-}
-\examples{
-
-do for all
-add percentages and formats to each number
 }

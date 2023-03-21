@@ -11,7 +11,7 @@ variableTypes(x)
 \item{x}{Tibble with different columns.}
 }
 \value{
-Tibble with the variables classification
+Tibble with the variables type and classification
 }
 \description{
 Classify the variables between 5 types: "numeric", "categorical", "binary",

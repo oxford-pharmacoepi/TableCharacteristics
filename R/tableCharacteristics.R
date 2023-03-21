@@ -554,91 +554,137 @@ summaryValues <- function(x, variables, bigMark, decimalMark, significativeDecim
       groupping = character()
     )
     if ("count" %in% functions || "%" %in% functions ) {
-      x %>%
-        dplyr::summarise(dplyr::across(
-          .cols = dplyr::all_of(.env$variablesFunction),
-          .fns = list("sum" = function(x) {sum(x)}),
-          .names = "{.col}"
-        )) %>%
-        tidyr::pivot_longer(
-          !"groupping", names_to = "variable", values_to = "count"
-        ) %>%
-        dplyr::inner_join(
-          x %>%
-            dplyr::summarise(denominator = as.numeric(dplyr::n())),
-          by = "groupping"
-        ) %>%
-        dplyr::mutate("%" = 100 * .data$count / .data$denominator) %>%
-        dplyr::mutate(
-          "%" = base::paste0(
-            base::format(
-              .data[["%"]],
-              big.mark = bigMark,
-              decimal.mark = decimalMark,
-              nsmall = ifelse(.data[["%"]] %% 1 == 0, 0, significativeDecimals)
-            ),
-            "%"
-          ),
-          count = base::format(
-            .data$count,
-            big.mark = bigMark,
-            decimal.mark = decimalMark,
-            nsmall = ifelse(.data$count %% 1 == 0, 0, significativeDecimals)
+      variablesFunction <- variablesCategorical %>%
+        dplyr::filter(.data$fun %in% c("count", "%")) %>%
+        dplyr::pull("variable") %>%
+        unique()
+      denominator <- x %>%
+        dplyr::group_by(.data$groupping) %>%
+        dplyr::summarise(denominator = as.numeric(dplyr::n()), .groups = "drop")
+      for (k in seq_along(variablesFunction)) {
+        categories <- x %>%
+          dplyr::select("category" = dplyr::all_of(variablesFunction[k])) %>%
+          dplyr::distinct()
+        result.k <- result.k %>%
+          dplyr::union_all(
+            x %>%
+              dplyr::rename("category" = dplyr::all_of(variablesFunction[k])) %>%
+              dplyr::group_by(.data$groupping, .data$category) %>%
+              dplyr::summarise(count = as.numeric(dplyr::n()), .groups = "drop") %>%
+              dplyr::right_join(categories, by = "category") %>%
+              dplyr::mutate(count = dplyr::if_else(
+                is.na(.data$count), 0, .data$count
+              )) %>%
+              dplyr::inner_join(denominator, by = "groupping") %>%
+              dplyr::mutate("%" = 100 * .data$count / .data$denominator) %>%
+              dplyr::mutate(
+                "%" = base::paste0(
+                  base::format(
+                    .data[["%"]],
+                    big.mark = bigMark,
+                    decimal.mark = decimalMark,
+                    nsmall = ifelse(.data[["%"]] %% 1 == 0, 0, significativeDecimals)
+                  ),
+                  "%"
+                ),
+                count = base::format(
+                  .data$count,
+                  big.mark = bigMark,
+                  decimal.mark = decimalMark,
+                  nsmall = ifelse(.data$count %% 1 == 0, 0, significativeDecimals)
+                )
+              ) %>%
+              dplyr::mutate(
+                count = paste0(.data$category, ": ", .data$count),
+                "%" = paste0(.data$category, ": ", .data[["%"]])
+              ) %>%
+              dplyr::select(-c("denominator", "category")) %>%
+              tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%
+              dplyr::inner_join(
+                variablesCategorical %>%
+                  dplyr::filter(.data$variable == .env$variablesFunction[k]) %>%
+                  dplyr::filter(.data$fun %in% c("count", "%")) %>%
+                  dplyr::select("variable", "variable_classification", "fun"),
+                by = "fun"
+              )
           )
-        ) %>%
-        tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%
-        dplyr::select(-"denominator") %>%
-        dplyr::inner_join(
-          variablesBinary %>%
-            dplyr::select("variable", "variable_classification", "fun"),
-          by = c("variable", "fun")
+
+
+      }
+    }
+    if ("distinct" %in% functions) {
+      variablesFunction <- variablesCategorical %>%
+        dplyr::filter(.data$fun == "distinct") %>%
+        dplyr::pull("variable")
+      result.k <- result.k %>%
+        dplyr::union_all(
+          x %>%
+            dplyr::group_by(.data$groupping) %>%
+            dplyr::summarise(dplyr::across(
+              dplyr::all_of(variablesFunction),
+              list("distinct" = function(x){dplyr::n_distinct(x)}),
+              .names = "{.col}"
+            )) %>%
+            tidyr::pivot_longer(!"groupping", names_to = "variable") %>%
+            dplyr::mutate(value = format(
+              round(.data$value), big.mark = bigMark
+            )) %>%
+            dplyr::mutate(fun = "distinct", variable_classification = "categorical")
         )
     }
+    variablesCategorical <- variablesCategorical %>%
+      dplyr::filter(!(.data$fun %in% c("count", "%", "distinct")))
     variablesFunction <- variablesCategorical %>%
       dplyr::pull("variable") %>%
       unique()
-    result <- result %>%
-      dplyr::union_all(
-        x %>%
-          dplyr::summarise(dplyr::across(
-            .cols = dplyr::all_of(.env$variablesFunction),
-            .fns = list("sum" = function(x) {sum(x)}),
-            .names = "{.col}"
-          )) %>%
-          tidyr::pivot_longer(
-            !"groupping", names_to = "variable", values_to = "count"
-          ) %>%
-          dplyr::inner_join(
-            x %>%
-              dplyr::summarise(denominator = as.numeric(dplyr::n())),
-            by = "groupping"
-          ) %>%
-          dplyr::mutate("%" = 100 * .data$count / .data$denominator) %>%
-          dplyr::mutate(
-            "%" = base::paste0(
-              base::format(
-                .data[["%"]],
+    for (k in seq_along(variablesFunction)) {
+      functions <- variablesCategorical %>%
+        dplyr::filter(.data$variable == .env$variablesFunction[k]) %>%
+        dplyr::pull("fun")
+      categories <- x %>%
+        dplyr::pull(dplyr::all_of(variablesFunction[k])) %>%
+        unique()
+      groups <- x %>%
+        dplyr::pull("groupping") %>%
+        unique()
+      categories <- tidyr::expand_grid(
+        groupping = groups,
+        category = categories
+      )
+      result.k <- result.k %>%
+        dplyr::union_all(
+          x %>%
+            dplyr::select(
+              "groupping", "category" = dplyr::all_of(variablesFunction[k])
+            ) %>%
+            dplyr::group_by(.data$groupping, .data$category) %>%
+            dplyr::summarise(count_per_category = dplyr::n(), .groups = "drop") %>%
+            dplyr::right_join(categories, by = c("groupping", "category")) %>%
+            dplyr::mutate(count_per_category = dplyr::if_else(
+              is.na(.data$count_per_category), 0, .data$count_per_category
+            )) %>%
+            dplyr::group_by(.data$groupping) %>%
+            dplyr::summarise(dplyr::across(
+              .cols = "count_per_category",
+              .fns = getFunctions(functions),
+              .names = "{.fn}"
+            )) %>%
+            tidyr::pivot_longer(!"groupping", names_to = "fun") %>%
+            dplyr::mutate(
+              variable = .env$variablesFunction[k],
+              variable_classification = "categorical"
+            ) %>%
+            dplyr::mutate(
+              value = base::format(
+                .data$value,
                 big.mark = bigMark,
                 decimal.mark = decimalMark,
-                nsmall = ifelse(.data[["%"]] %% 1 == 0, 0, significativeDecimals)
-              ),
-              "%"
-            ),
-            count = base::format(
-              .data$count,
-              big.mark = bigMark,
-              decimal.mark = decimalMark,
-              nsmall = ifelse(.data$count %% 1 == 0, 0, significativeDecimals)
+                nsmall = ifelse(.data$value %% 1 == 0, 0, significativeDecimals)
+              )
             )
-          ) %>%
-          tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%
-          dplyr::select(-"denominator") %>%
-          dplyr::inner_join(
-            variablesBinary %>%
-              dplyr::select("variable", "variable_classification", "fun"),
-            by = c("variable", "fun")
-          )
-      )
+        )
+    }
+
   }
 }
 

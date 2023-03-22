@@ -354,12 +354,29 @@ tableCharacteristics <- function (
     )
 
   variables %>%
+    dplyr::filter(
+      .data$variable_classification == "categorical" &
+        .data$fun %in% c("count", "%")
+    ) %>%
+    tidyr::separate("value", c("value", "category"), sep = ": ", extra = "merge")
+  resultsFormat <- variables %>%
     dplyr::filter(.data$variable_classification != "categorical") %>%
-    tidyr::pivot_wider(names_from = "fun", values_from = "value") %>%
+    dplyr::select("variable_classification", "format") %>%
+    dplyr::distinct() %>%
+    dplyr::rowwise() %>%
     dplyr::mutate(result = getEvalString(
       .data$format, .data$variable_classification
-    )) %>%
-    dplyr::mutate(result = eval(parse(text = .data$result)))
+    ))
+
+  variables %>%
+    dplyr::filter(.data$variable_classification != "categorical") %>%
+    tidyr::pivot_wider(names_from = "fun", values_from = "value") %>%
+    dplyr::inner_join(
+      resultsFormat, by = c("variable_classification", "format")
+    ) %>%
+    dplyr::rowwise() %>%
+    dplyr::mutate(result = eval(parse(text = .data$result))) %>%
+    dplyr::select("groupping", "variable", "order", "format", "result")
 
   if (isTRUE(smd)) {
     asmdResults <- computeASMD(
@@ -982,8 +999,8 @@ getCategoricalValues <- function(x, variablesCategorical, groupVariable, bigMark
           )
         ) %>%
         dplyr::mutate(
-          count = paste0(.data$category, ": ", .data$count),
-          "%" = paste0(.data$category, ": ", .data[["%"]])
+          count = paste0(.data$count, ": ", .data$category),
+          "%" = paste0(.data[["%"]], ": ", .data$category)
         ) %>%
         dplyr::select(-c("denominator", "category")) %>%
         tidyr::pivot_longer(c("count", "%"), names_to = "fun") %>%

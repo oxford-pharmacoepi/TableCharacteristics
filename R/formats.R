@@ -156,6 +156,16 @@ assertFormat <- function(f, vt) {
 }
 
 #' @noRd
+getEvalString <- function(f, vt) {
+  functions <- assertFormat(f, vt)
+  for (k in seq_along(functions)) {
+    f <- gsub(functions[k], paste0('"', ', .data[["', functions[k], '"]] , "'), f)
+  }
+  f <- paste0('paste0("', f, '")')
+  return(f)
+}
+
+#' @noRd
 compatibleType <- function(t) {
   if (length(t) == 1 && t %in% c("numeric", "binary", "date", "categorical")) {
     return(t)

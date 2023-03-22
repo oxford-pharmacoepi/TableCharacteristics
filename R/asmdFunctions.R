@@ -4,11 +4,11 @@ asmdBinary <- function(x, variables = NULL, groupName = "group", weight = NULL) 
     variables <- colnames(x)[!(colnames(x) %in% c(groupName, weight))]
   }
   if (is.null(weight)) {
-    x <- x %>% mutate(weight = 1)
+    x <- x %>% dplyr::mutate(weight = 1)
   } else {
-    x <- x %>% rename("weight" = dplyr::all_of(weight))
+    x <- x %>% dplyr::rename("weight" = dplyr::all_of(weight))
   }
-  x <- x %>% rename("group" = dplyr::all_of(groupName))
+  x <- x %>% dplyr::rename("group" = dplyr::all_of(groupName))
   for (variable in variables) {
     lab <- unique(x[[variable]])
     if (!all(lab %in% c(0, 1))) {
@@ -32,7 +32,7 @@ asmdBinary <- function(x, variables = NULL, groupName = "group", weight = NULL) 
     tidyr::pivot_wider(names_from = c("func", "group"), values_from = "value") %>%
     dplyr::mutate(asmd = abs(.data$mean_1-.data$mean_2)/sqrt((.data$var_1+.data$var_2)/2)) %>%
     dplyr::select("variable", "asmd") %>%
-    mutate(asmd_type = "binary")
+    dplyr::mutate(asmd_type = "binary")
 
 }
 
@@ -42,11 +42,11 @@ asmdContinuous <- function(x, variables = NULL, groupName = "group", weight = NU
     variables <- colnames(x)[!(colnames(x) %in% c(groupName, weight))]
   }
   if (is.null(weight)) {
-    x <- x %>% mutate(weight = 1)
+    x <- x %>% dplyr::mutate(weight = 1)
   } else {
-    x <- x %>% rename("weight" = dplyr::all_of(weight))
+    x <- x %>% dplyr::rename("weight" = dplyr::all_of(weight))
   }
-  x <- x %>% rename("group" = dplyr::all_of(groupName))
+  x <- x %>% dplyr::rename("group" = dplyr::all_of(groupName))
   lab <- unique(x$group)
   x %>%
     dplyr::mutate(group = dplyr::if_else(.data$group == .env$lab[1], 1, 2)) %>%
@@ -64,8 +64,7 @@ asmdContinuous <- function(x, variables = NULL, groupName = "group", weight = NU
     tidyr::pivot_wider(names_from = c("func", "group"), values_from = "value") %>%
     dplyr::mutate(asmd = abs(.data$mean_1-.data$mean_2)/sqrt(.data$var_1+.data$var_2)) %>%
     dplyr::select("variable", "asmd") %>%
-    mutate(asmd_type = "continuous")
-
+    dplyr::mutate(asmd_type = "continuous")
 }
 
 #' @noRd
@@ -109,7 +108,7 @@ asmdCategorical <- function(x, variables = NULL, groupName = "group", weight = N
       asmd = asmdFromPercentage(TT, CC)
     ))
   }
-  result <- result %>% mutate(asmd_type = "categorical")
+  result <- result %>% dplyr::mutate(asmd_type = "categorical")
   return(result)
 }
 
@@ -127,4 +126,49 @@ asmdFromPercentage <- function(TT, CC) {
   diag(S) <- (TT*(1-TT) + CC*(1-CC)) / 2
   asmd <- as.numeric(sqrt(vect %*% solve(S) %*% vect))
   return(asmd)
+}
+
+#' @noRd
+computeASMD <- function(x,
+                        binaryVariables,
+                        numericVariables,
+                        categoricalVariables,
+                        dateVariables,
+                        groupVariable,
+                        referenceGroup,
+                        weight = NULL) {
+  groups <- unique(x[[groupVariable]])
+  comparisons <- dplyr::tibble(
+    reference = referenceGroup,
+    comparator = groups[!(groups %in% referenceGroup)]
+  )
+  result <- dplyr::tibble(
+    reference = character(),
+    comparator = character(),
+    variable = character(),
+    asmd_type = character(),
+    asmd = numeric()
+  )
+  for (k in 1:nrow(comparisons)) {
+    xx <- x %>%
+      dplyr::filter(
+        .data[[groupVariable]] %in%
+          c(comparisons$reference[k], comparisons$comparator[k])
+      )
+    result <- result %>%
+      dplyr::union_all(
+        asmdBinary(xx, binaryVariables, groupVariable, weight) %>%
+          dplyr::union_all(asmdContinuous(
+            xx, c(numericVariables, dateVariables), groupVariable, weight
+          )) %>%
+          dplyr::union_all(asmdCategorical(
+            xx, categoricalVariables, groupVariable, weight
+          )) %>%
+          dplyr::mutate(
+            reference = comparisons$reference[k],
+            comparator = comparisons$comparator[k]
+          )
+      )
+  }
+  return(result)
 }

@@ -87,7 +87,11 @@ tableCharacteristics <- function (
         dplyr::pull()
       checkmate::assertTRUE(length(referenceGroup) == 1)
       checkmate::assertTRUE(referenceGroup %in% groups)
-      smd <- TRUE
+      if (length(groups) > 1) {
+        smd <- TRUE
+      } else {
+        smd <- FALSE
+      }
     }
   } else {
     checkmate::assertNull(referenceGroup)
@@ -116,20 +120,23 @@ tableCharacteristics <- function (
     )
     if (t == "incompatible") {
       stop(paste0(
-        paste0(otherVariables[[k]], collapse = ", "), "are not compatible"
+        paste0(otherVariables[[k]], collapse = ", "), " are not compatible"
       ))
     }
-    functions <- assertFormat(otherFormat[[k]], t)
-    if (length(functions) == 0) {
-      stop(paste0("No function detected in otherFormat[[", k, "]]"))
-    } else {
-      variables <- variables %>%
-        dplyr::union_all(tidyr::expand_grid(
-          variable = otherVariables[[k]],
-          variable_classification = t,
-          format = otherFormat[[k]],
-          fun = functions
-        ))
+    otherFormatK <- strsplit(otherFormat[[k]], "\n")[[1]]
+    for (kk in seq_along(otherFormatK)) {
+      functions <- assertFormat(otherFormatK[kk], "numeric")
+      if (length(functions) == 0) {
+        stop(paste0("No function detected in line ", kk, " of otherFormat[[", k, "]]"))
+      } else {
+        variables <- variables %>%
+          dplyr::union_all(tidyr::expand_grid(
+            variable = otherVariables[[k]],
+            fun = functions,
+            variable_classification = t,
+            format = otherFormatK[kk]
+          ))
+      }
     }
   }
   ## if variables groups are NA detect automatically
@@ -170,17 +177,20 @@ tableCharacteristics <- function (
         dplyr::pull("variable_classification") %in%
         c("numeric", "binary")
     ))
-    functions <- assertFormat(numericFormat, "numeric")
-    if (length(functions) == 0) {
-      stop("No function detected in numericFormat")
-    } else {
-      variables <- variables %>%
-        dplyr::union_all(tidyr::expand_grid(
-          variable = numericVariables,
-          fun = functions,
-          variable_classification = "numeric",
-          format = numericFormat
-        ))
+    numericFormat <- strsplit(numericFormat, "\n")[[1]]
+    for (k in seq_along(numericFormat)) {
+      functions <- assertFormat(numericFormat[k], "numeric")
+      if (length(functions) == 0) {
+        stop(paste0("No function detected in line ", k, " of numericFormat"))
+      } else {
+        variables <- variables %>%
+          dplyr::union_all(tidyr::expand_grid(
+            variable = numericVariables,
+            fun = functions,
+            variable_classification = "numeric",
+            format = numericFormat[k]
+          ))
+      }
     }
   } else {
     checkmate::assertNull(numericFormat)
@@ -193,17 +203,20 @@ tableCharacteristics <- function (
         dplyr::filter(.data$variable %in% .env$dateVariables) %>%
         dplyr::pull("variable_classification") == "date"
     ))
-    functions <- assertFormat(dateFormat, "date")
-    if (length(functions) == 0) {
-      stop("No function detected in dateFormat")
-    } else {
-      variables <- variables %>%
-        dplyr::union_all(tidyr::expand_grid(
-          variable = dateVariables,
-          fun = functions,
-          variable_classification = "date",
-          format = dateFormat
-        ))
+    dateFormat <- strsplit(dateFormat, "\n")[[1]]
+    for (k in seq_along(dateFormat)) {
+      functions <- assertFormat(dateFormat[k], "date")
+      if (length(functions) == 0) {
+        stop(paste0("No function detected in line ", k, " of dateFormat"))
+      } else {
+        variables <- variables %>%
+          dplyr::union_all(tidyr::expand_grid(
+            variable = dateVariables,
+            fun = functions,
+            variable_classification = "date",
+            format = dateFormat[k]
+          ))
+      }
     }
   } else {
     checkmate::assertNull(dateFormat)
@@ -216,17 +229,20 @@ tableCharacteristics <- function (
         dplyr::filter(.data$variable %in% .env$categoricalVariables) %>%
         dplyr::pull("variable_classification") == "categorical"
     ))
-    functions <- assertFormat(categoricalFormat, "categorical")
-    if (length(functions) == 0) {
-      stop("No function detected in categoricalFormat")
-    } else {
-      variables <- variables %>%
-        dplyr::union_all(tidyr::expand_grid(
-          variable = categoricalVariables,
-          fun = functions,
-          variable_classification = "categorical",
-          format = categoricalFormat
-        ))
+    categoricalFormat <- strsplit(categoricalFormat, "\n")[[1]]
+    for (k in seq_along(categoricalFormat)) {
+      functions <- assertFormat(categoricalFormat[k], "categorical")
+      if (length(functions) == 0) {
+        stop(paste0("No function detected in line ", k, " of categoricalFormat"))
+      } else {
+        variables <- variables %>%
+          dplyr::union_all(tidyr::expand_grid(
+            variable = categoricalVariables,
+            fun = functions,
+            variable_classification = "categorical",
+            format = categoricalFormat[k]
+          ))
+      }
     }
   } else {
     checkmate::assertNull(categoricalFormat)
@@ -239,17 +255,20 @@ tableCharacteristics <- function (
         dplyr::filter(.data$variable %in% .env$binaryVariables) %>%
         dplyr::pull("variable_classification") == "binary"
     ))
-    functions <- assertFormat(binaryFormat, "binary")
-    if (length(functions) == 0) {
-      stop("No function detected in binaryFormat")
-    } else {
-      variables <- variables %>%
-        dplyr::union_all(tidyr::expand_grid(
-          variable = binaryVariables,
-          fun = functions,
-          variable_classification = "binary",
-          format = binaryFormat
-        ))
+    binaryFormat <- strsplit(binaryFormat, "\n")[[1]]
+    for (k in seq_along(binaryFormat)) {
+      functions <- assertFormat(binaryFormat[k], "binary")
+      if (length(functions) == 0) {
+        stop(paste0("No function detected in line ", k, " of binaryFormat"))
+      } else {
+        variables <- variables %>%
+          dplyr::union_all(tidyr::expand_grid(
+            variable = binaryVariables,
+            fun = functions,
+            variable_classification = "binary",
+            format = binaryFormat[k]
+          ))
+      }
     }
   } else {
     checkmate::assertNull(binaryFormat)
@@ -326,6 +345,28 @@ tableCharacteristics <- function (
     decimalMark,
     significativeDecimals
   )
+
+  variables <- variables %>%
+    dplyr::inner_join(
+      result,
+      by = c("variable", "variable_classification", "fun"),
+      multiple = "all"
+    )
+
+  variables %>%
+    dplyr::filter(.data$variable_classification != "categorical") %>%
+    tidyr::pivot_wider(names_from = "fun", values_from = "value") %>%
+    dplyr::mutate(result = getEvalString(
+      .data$format, .data$variable_classification
+    )) %>%
+    dplyr::mutate(result = eval(parse(text = .data$result)))
+
+  if (isTRUE(smd)) {
+    asmdResults <- computeASMD(
+      x, binaryVariables, numericVariables, categoricalVariables, dateVariables,
+      groupVariable, referenceGroup
+    )
+  }
 
 }
 
@@ -1062,78 +1103,4 @@ getCategoricalValues <- function(x, variablesCategorical, groupVariable, bigMark
     result <- dplyr::union_all(result, result.k)
   }
   return(result)
-}
-
-# variable function
-variableTibble <- function(
-    x,
-    variablesOrder,
-    variables,
-    formats
-) {
-  order <- dplyr::tibble(variable = order, order = dplyr::row_number())
-  variable_settings <- NULL
-  for (k in 1:length(variables)) {
-    variable_type <- variableType(x, variables[[k]])
-    variable_tibble_k <- dplyr::tibble(
-      variable = variables[[k]],
-      variable_type = variable_type
-    )
-    variable_settings <- variable_settings %>%
-      dplyr::union_all(
-        variable_tibble_k %>%
-          dplyr::left_join(
-            dplyr::tibble(variable_type = variable_type) %>%
-              dplyr::mutate(
-                smd_type = dplyr::if_else(
-                  .data$variable_type %in% c("numeric", "date"),
-                  "numeric",
-                  "categorical"
-                ),
-                format = strsplit(format[[k]], "\n")[[1]],
-                variable_group = k
-              ) %>%
-              dplyr::mutate(
-                functions = getFunctions(.data$format, .data$variable_type),
-                format = subFormat(.data$format, .data$variable_type),
-                number_lines = length(.data$format),
-                line_number = dplyr::row_number()
-              ),
-            by = "variable_type"
-          )
-      )
-  }
-  variable_settings <- variable_settings %>%
-    dplyr::mutate(
-      smd_type = dplyr::if_else(.data$number_lines > 1, NA, .data$smd_type)
-    ) %>%
-    dplyr::union_all(
-      variable_settings %>%
-        dplyr::filter(.data$number_lines > 1 & .data$line_number == 1) %>%
-        mutate(
-          line_number = 0,
-          functions = NA,
-          format = NA,
-        )
-    ) %>%
-    dplyr::inner_join(variable_settings, by = "variable") %>%
-    dplyr::arrange(.data$order, .data$line_number) %>%
-    dplyr::mutate(
-      variable_new_name = paste0("var", .data$order),
-      column_name = paste0("column", .data$order),
-      row_name = dplyr::if_else(
-        .data$number_lines == 1,
-        paste0(.data$variable, " ", .data$format),
-        dplyr::if_else(.data$line_number == 0, .data$variable, .data$format)
-      ),
-      content = dplyr::if_else(
-        is.na(.data$format),
-        NA,
-        gsub("#VAR#", .data$variable_new_name, .data$format)
-      )
-    )
-
-  #variable variable_type functions row_name variable_id column_name value smd
-  #age "age mean (sd)" var1 column_1 'paste0(.data$var1_mean, " (", .data$var1_sd, ")")' TRUE
-
 }

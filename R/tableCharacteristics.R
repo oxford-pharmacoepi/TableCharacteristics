@@ -353,12 +353,13 @@ tableCharacteristics <- function (
       multiple = "all"
     )
 
-  variables %>%
-    dplyr::filter(
-      .data$variable_classification == "categorical" &
-        .data$fun %in% c("count", "%")
-    ) %>%
-    tidyr::separate("value", c("value", "category"), sep = ": ", extra = "merge")
+  # variables %>%
+  #   dplyr::filter(
+  #     .data$variable_classification == "categorical" &
+  #       .data$fun %in% c("count", "%")
+  #   ) %>%
+  #   tidyr::separate("value", c("value", "category"), sep = ": ", extra = "merge")
+
   resultsFormat <- variables %>%
     dplyr::filter(.data$variable_classification != "categorical") %>%
     dplyr::select("variable_classification", "format") %>%
@@ -366,7 +367,8 @@ tableCharacteristics <- function (
     dplyr::rowwise() %>%
     dplyr::mutate(result = getEvalString(
       .data$format, .data$variable_classification
-    ))
+    )) %>%
+    dplyr::ungroup()
 
   variables %>%
     dplyr::filter(.data$variable_classification != "categorical") %>%

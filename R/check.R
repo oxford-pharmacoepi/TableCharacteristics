@@ -58,55 +58,48 @@ computeVariables <- function(x,
   if (length(binaryVariables) == 1 && is.na(binaryVariables)) {
     binaryVariables <- automaticVariables(x, "binary", groupVariable)
   }
+  variable <- NULL
   ## numeric variables
-  variableNumeric <- addFormats(
-    x, numericVariables, numericFormat, "numericFormat", "numeric"
-  )
+  variable <- variable %>%
+    dplyr::union_all(addFormats(
+      x, numericVariables, numericFormat, "numericFormat", "numeric"
+    ))
   ## date variables
-  variableDate <- addFormats(
-    x, dateVariables, dateFormat, "dateFormat", "date"
-  )
+  variable <- variable %>%
+    dplyr::union_all( addFormats(
+      x, dateVariables, dateFormat, "dateFormat", "date"
+    ))
   ## categorical variables
-  variableCategorical <- addFormats(
-    x, categoricalVariables, categoricalFormat, "categoricalFormat", "categorical"
-  )
+  variable <- variable %>%
+    dplyr::union_all(addFormats(
+      x, categoricalVariables, categoricalFormat, "categoricalFormat",
+      "categorical"
+    ))
   ## binary variables
-  variableBinary <- addFormats(
-    x, binaryVariables, binaryFormat, "binaryFormat", "binary"
-  )
+  variable <- variable %>%
+    dplyr::union_all(addFormats(
+      x, binaryVariables, binaryFormat, "binaryFormat", "binary"
+    ))
+  ## other variables
   for (k in seq_along(otherFormat)) {
-    checkmate::assertTRUE(all(otherVariables[[k]] %in% colnames(x)))
-    t <- compatibleType(
-      variableType %>%
-        dplyr::filter(.data$variable %in% .env$otherVariables[[k]]) %>%
-        dplyr::pull("variable_classification") %>%
-        unique()
-    )
+    t <- variableTypes(x) %>%
+      dplyr::filter(.data$variable %in% .env$otherVariables[[k]]) %>%
+      dplyr::pull("variable_classification") %>%
+      unique() %>%
+      compatibleType()
     if (t == "incompatible") {
-      stop(paste0(
+      cli::cli_abort(paste0(
         paste0(otherVariables[[k]], collapse = ", "), " are not compatible"
       ))
-    }
-    otherFormatK <- strsplit(otherFormat[[k]], "\n")[[1]]
-    for (kk in seq_along(otherFormatK)) {
-      functions <- assertFormat(otherFormatK[kk], "numeric")
-      if (length(functions) == 0) {
-        stop(paste0("No function detected in line ", kk, " of otherFormat[[", k, "]]"))
-      } else {
-        variables <- variables %>%
-          dplyr::union_all(tidyr::expand_grid(
-            variable = otherVariables[[k]],
-            fun = functions,
-            variable_classification = t,
-            format = otherFormatK[kk]
-          ))
-      }
+    } else {
+      variable <- variable %>%
+        dplyr::union_all(addFormats(
+          x, otherVariables[[k]], otherFormat[k],
+          paste0("otherFormat[", k, "]"), t
+        ))
     }
   }
-  variables <- variableNumeric %>%
-    dplyr::union_all(variableDate) %>%
-    dplyr::union_all(variableCategorical) %>%
-    dplyr::union_all(variableBinary)
+  return(variable)
 }
 
 #' @noRd
@@ -228,4 +221,9 @@ automaticVariables <- function(x, type, not) {
     dplyr::filter(!(.data$variable %in% .env$not)) %>%
     dplyr::filter(.data$variable_classification == .env$type) %>%
     dplyr::pull("variable")
+}
+
+#' @noRd
+checkGroupAndOrder <- function(x, variable, groupNames, order) {
+
 }
